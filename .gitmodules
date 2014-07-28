@@ -55,3 +55,15 @@
 [submodule "external/summernote"]
 	path = external/summernote
 	url = https://github.com/HackerWins/summernote.git
+[submodule "IdnoPlugins/Twitter"]
+	path = IdnoPlugins/Twitter
+	url = https://github.com/idno/Twitter.git
+[submodule "IdnoPlugins/Facebook"]
+	path = IdnoPlugins/Facebook
+	url = https://github.com/idno/Facebook.git
+[submodule "IdnoPlugins/Flickr"]
+	path = IdnoPlugins/Flickr
+	url = https://github.com/idno/Flickr.git
+[submodule "IdnoPlugins/IndiePub"]
+	path = IdnoPlugins/IndiePub
+	url = https://github.com/idno/IndiePub.git
