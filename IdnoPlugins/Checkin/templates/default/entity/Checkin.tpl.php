@@ -32,7 +32,7 @@
     map<?=$object->_id?>.addLayer(layer<?=$object->_id?>);
     */
     
-    var defaultLayer = L.tileLayer.provider('OpenStreetMap.Mapnik').addTo(map);
+    var defaultLayer = L.tileLayer.provider('OpenStreetMap.Mapnik').addTo(map<?=$object->_id?>);
     
     var baseLayers = {
     			'OpenStreetMap Default': defaultLayer,
