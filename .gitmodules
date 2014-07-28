@@ -55,3 +55,6 @@
 [submodule "external/summernote"]
 	path = external/summernote
 	url = https://github.com/HackerWins/summernote.git
+[submodule "IdnoPlugins/Checkin/external/leaflet-providers"]
+	path = IdnoPlugins/Checkin/external/leaflet-providers
+	url = https://github.com/leaflet-extras/leaflet-providers.git
