@@ -77,7 +77,7 @@
 		'OpenWeatherMap Snow': L.tileLayer.provider('OpenWeatherMap.Snow')
 	};
 
-	var layerControl = L.control.layers(baseLayers, overlayLayers, {collapsed: false}).addTo(map<?=$object->_id?>);
+	var layerControl = L.control.layers(baseLayers, overlayLayers).addTo(map<?=$object->_id?>);
     
 	// resize layers control to fit into view.
 	function resizeLayerControl() {
