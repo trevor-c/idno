@@ -79,17 +79,6 @@
 
 	var layerControl = L.control.layers(baseLayers, overlayLayers).addTo(map<?=$object->_id?>);
     
-	// resize layers control to fit into view.
-	function resizeLayerControl() {
-		var layerControlHeight = document.body.clientHeight - (10 + 50);
-		var layerControl = document.getElementsByClassName('leaflet-control-layers-expanded')[0];
-
-		layerControl.style.overflowY = 'auto';
-		layerControl.style.maxHeight = layerControlHeight + 'px';
-	}
-	map<?=$object->_id?>.on('resize', resizeLayerControl);
-	resizeLayerControl();
-    
     var marker<?=$object->_id?> = L.marker([<?=$object->lat?>, <?=$object->long?>]);
     marker<?=$object->_id?>.addTo(map<?=$object->_id?>);
     //map<?=$object->_id?>.zoomControl.disable();
