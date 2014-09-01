@@ -22,6 +22,13 @@
     <meta name="viewport" content="initial-scale=1.0" media="(device-height: 568px)"/>
     <meta name="description" content="<?= htmlspecialchars(strip_tags($vars['description'])) ?>">
     <meta name="generator" content="Known http://withknown.com">
+    
+<!--Le fav and touch icons-->
+<link rel="apple-touch-icon" sizes="57x57" href="<?=\Idno\Core\site()->config()->getURL()?>gfx/logos/apple-icon-57x57.png" />
+<link rel="apple-touch-icon" sizes="72x72" href="<?=\Idno\Core\site()->config()->getURL()?>gfx/logos/apple-icon-72x72.png" />
+<link rel="apple-touch-icon" sizes="114x114" href="<?=\Idno\Core\site()->config()->getURL()?>gfx/logos/apple-icon-114x114.png" />
+<link rel="apple-touch-icon" sizes="144x144" href="<?=\Idno\Core\site()->config()->getURL()?>gfx/logos/apple-icon-144x144.png" />
+
     <?= $this->draw('shell/favicon'); ?>
 
     <?php
@@ -36,16 +43,19 @@
 
             $opengraph['og:url'] = \Idno\Core\site()->currentPage()->currentUrl();
 
-            $owner = $vars['object']->getOwner();
-            $object = $vars['object'];
-	
-            $opengraph['og:title'] = $vars['object']->getTitle();
-            $opengraph['og:description'] = $vars['object']->getShortDescription();
-            $opengraph['og:type'] = $vars['object']->getActivityStreamsObjectType();
-            $opengraph['og:image'] = $owner->getIcon(); //Icon, for now set to being the author profile pic
-            
-            if ($url = $vars['object']->getURL())
-                $opengraph['og:url'] = $vars['object']->getURL();  
+            if (!empty($vars['object'])) {
+                $owner = $vars['object']->getOwner();
+                $object = $vars['object'];
+
+                $opengraph['og:title'] = $vars['object']->getTitle();
+                $opengraph['og:description'] = $vars['object']->getShortDescription();
+                $opengraph['og:type'] = $vars['object']->getActivityStreamsObjectType();
+                $opengraph['og:image'] = $owner->getIcon(); //Icon, for now set to being the author profile pic
+
+                if ($url = $vars['object']->getURL()) {
+                    $opengraph['og:url'] = $vars['object']->getURL();
+                }
+            }
             
         }
         
@@ -61,17 +71,21 @@
 
         if (\Idno\Core\site()->currentPage() && \Idno\Core\site()->currentPage()->isPermalink()) {
             /* @var \Idno\Common\Entity $object */
-            if ($creator = $object->getOwner()) {
-                ?>
-                <meta name="DC.creator" content="<?= htmlentities($creator->getTitle()) ?>"><?php
-            }
-            if ($created = $object->created) {
-                ?>
-                <meta name="DC.date" content="<?= date('c', $created) ?>"><?php
-            }
-            if ($url = $object->getURL()) {
-                ?>
-                <meta name="DC.identifier" content="<?= htmlspecialchars($url) ?>"><?php
+            if ($object instanceof \Idno\Common\Entity) {
+
+                if ($creator = $object->getOwner()) {
+                    ?>
+                    <meta name="DC.creator" content="<?= htmlentities($creator->getTitle()) ?>"><?php
+                }
+                if ($created = $object->created) {
+                    ?>
+                    <meta name="DC.date" content="<?= date('c', $created) ?>"><?php
+                }
+                if ($url = $object->getURL()) {
+                    ?>
+                    <meta name="DC.identifier" content="<?= htmlspecialchars($url) ?>"><?php
+                }
+
             }
         }
 

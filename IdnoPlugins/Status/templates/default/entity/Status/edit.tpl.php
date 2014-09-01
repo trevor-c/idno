@@ -62,10 +62,15 @@
             <?php
             }
             ?>
+                    <label>
+                        Tags <br/>
+                        <input type="text" name="tags" id="tags" placeholder="Add some #tags"
+                               value="<?= htmlspecialchars($vars['object']->tags) ?>" class="span8"/>
+                    </label>
 
             <p>
                 <small><a id="inreplyto-add" href="#"
-                          onclick="$('#inreplyto').append('<span><input required type=&quot;url&quot; name=&quot;inreplyto[]&quot; value=&quot;&quot; placeholder=&quot;Add the URL that you\'re replying to&quot; class=&quot;span8&quot; /> <small><a href=&quot;#&quot; onclick=&quot;$(this).parent().parent().remove(); return false;&quot;>Remove</a></small><br /></span>'); return false;">+
+                          onclick="$('#inreplyto').append('<span><input required type=&quot;url&quot; name=&quot;inreplyto[]&quot; value=&quot;&quot; placeholder=&quot;Add the URL that you\'re replying to&quot; class=&quot;span8&quot; /> <small><a href=&quot;#&quot; onclick=&quot;$(this).parent().parent().remove(); return false;&quot;><icon class=&quot;icon-remove&quot;></icon> Remove URL</a></small><br /></span>'); return false;"><icon class="icon-reply"></icon>
                         Reply to a site</a></small>
             </p>
             <div id="inreplyto">
@@ -78,7 +83,8 @@
                                        placeholder="Add the URL that you're replying to"
                                        class="span8" value="<?= htmlspecialchars($inreplyto) ?>"/>
                                 <small><a href="#"
-                                          onclick="$(this).parent().parent().remove(); return false;">Remove</a></small>
+                                          onclick="$(this).parent().parent().remove(); return false;"><icon class="icon-remove"></icon> 
+                                          Remove URL</a></small>
                             </p>
                         <?php
                         }

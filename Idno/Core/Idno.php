@@ -25,14 +25,19 @@
             public $pagehandlers;
             public $public_pages;
             public $syndication;
+            public $logging;
             public static $site;
             public $currentPage;
+            public $known_hub;
 
             function init()
             {
                 self::$site       = $this;
                 $this->dispatcher = new \Symfony\Component\EventDispatcher\EventDispatcher();
                 $this->config     = new Config();
+                if ($this->config->isDefaultConfig()) {
+                    // TODO: invoke installer
+                }
                 switch ($this->config->database) {
                     case 'mongodb':
                         $this->db = new DataConcierge();
@@ -82,8 +87,26 @@
                 $this->actions     = new Actions();
                 $this->template    = new Template();
                 $this->syndication = new Syndication();
+                $this->logging     = new Logging();
                 $this->plugins     = new Plugins(); // This must be loaded last
                 $this->themes      = new Themes();
+
+                // Connect to a Known hub if one is listed in the configuration file
+                // (and this isn't the hub!)
+                if (empty(site()->session()->hub_connect)) {
+                    site()->session()->hub_connect = 0;
+                }
+                if (
+                    !empty($this->config->known_hub) &&
+                    !substr_count($_SERVER['REQUEST_URI'], '.')
+                    && site()->session()->hub_connect < (time() - 10)
+                    && $this->config->known_hub != $this->config->url
+                ) {
+                    site()->session()->hub_connect = time();
+                    \Idno\Core\site()->logging->log('Connecting to ' . $this->config->known_hub);
+                    \Idno\Core\site()->known_hub = new \Idno\Core\Hub($this->config->known_hub);
+                    \Idno\Core\site()->known_hub->connect();
+                }
 
                 User::registerEvents();
             }
@@ -118,6 +141,7 @@
                 $this->addPageHandler('/bookmarklet\.js', '\Idno\Pages\Entity\Bookmarklet', true);
 
                 /** Files */
+                $this->addPageHandler('/file/upload/?', '\Idno\Pages\File\Upload', true);
                 $this->addPageHandler('/file/([A-Za-z0-9]+)(/.*)?', '\Idno\Pages\File\View', true);
 
                 /** Users */
@@ -136,10 +160,11 @@
                 $this->addPageHandler('/autosave/?', '\Idno\Pages\Entity\Autosave');
 
                 /** Installation / first use */
-                $this->addPageHandler('/begin/?', '\Idno\Pages\Onboarding\Begin',true);
-                $this->addPageHandler('/begin/register/?', '\Idno\Pages\Onboarding\Register',true);
+                $this->addPageHandler('/begin/?', '\Idno\Pages\Onboarding\Begin', true);
+                $this->addPageHandler('/begin/register/?', '\Idno\Pages\Onboarding\Register', true);
                 $this->addPageHandler('/begin/profile/?', '\Idno\Pages\Onboarding\Profile');
                 $this->addPageHandler('/begin/connect/?', '\Idno\Pages\Onboarding\Connect');
+                $this->addPageHandler('/begin/connect\-forwarder/?', '\Idno\Pages\Onboarding\ConnectForwarder');
                 $this->addPageHandler('/begin/publish/?', '\Idno\Pages\Onboarding\Publish');
 
             }
@@ -171,6 +196,15 @@
             function &filesystem()
             {
                 return $this->filesystem;
+            }
+
+            /**
+             * Returns the current Known hub
+             * @return \Idno\Core\Hub
+             */
+            function &hub()
+            {
+                return $this->known_hub;
             }
 
             /**
@@ -446,7 +480,16 @@
              */
             function version()
             {
-                return '0.1-dev';
+                return '0.6-dev';
+            }
+
+            /**
+             * Alias for version()
+             * @return string
+             */
+            function getVersion()
+            {
+                return $this->version();
             }
 
             /**
@@ -529,6 +572,31 @@
             {
                 return true;
             }
+
+            /**
+             * Retrieve notices (eg notifications that a new version has been released) from Known HQ
+             * @return mixed
+             */
+            function getVendorMessages()
+            {
+
+                if (!empty(site()->config()->noping)) {
+                    return '';
+                }
+                $web_client = new Webservice();
+                $results    = $web_client->post('http://withknown.com/vendor-services/messages/', [
+                    'url'     => site()->config()->getURL(),
+                    'title'   => site()->config()->getTitle(),
+                    'version' => site()->getVersion(),
+                    'public'  => site()->config()->isPublicSite(),
+                    'hub'     => site()->config()->known_hub
+                ]);
+                if ($results['response'] == 200) {
+                    return $results['content'];
+                }
+
+            }
+
         }
 
         /**
