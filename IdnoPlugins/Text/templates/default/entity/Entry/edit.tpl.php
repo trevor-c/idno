@@ -5,18 +5,18 @@
     if (!empty($vars['object']->body)) {
         $body = $vars['object']->body;
     } else {
-        $body = $autosave->getValue('entry', 'body');
+        $body = ''; //$autosave->getValue('entry', 'body');
     }
     if (!empty($vars['object']->title)) {
         $title = $vars['object']->title;
     } else {
-        $title = $autosave->getValue('entry', 'title');
+        $title = ''; //$autosave->getValue('entry', 'title');
     }
 
     /* @var \Idno\Core\Template $this */
 
 ?>
-    <form action="<?= $vars['object']->getURL() ?>" method="post" onsubmit="return postForm()">
+    <form action="<?= $vars['object']->getURL() ?>" method="post" >
 
         <div class="row">
 
@@ -57,13 +57,16 @@
                 </p>
 
                 <?php if (empty($vars['object']->_id)) echo $this->drawSyndication('article'); ?>
+                    <label>
+                        Tags<br/>
+                        <input type="text" name="tags" id="tags" placeholder="Add some #tags"
+                               value="<?= htmlspecialchars($vars['object']->tags) ?>" class="span8"/>
+                    </label>
 
                 <div class="wordcount" id="result">
 
                     Total words <strong><span id="totalWords">0</span></strong>
                 </div>
-                <p class="note">Posts support <strong>text</strong> and <strong>markup</strong>. Feel free to add
-                    <strong>#tags</strong>.</p>
 
                 <p class="button-bar ">
                     <?= \Idno\Core\site()->actions()->signForm('/text/edit') ?>
@@ -78,14 +81,16 @@
     </form>
     <script>
 
-        function postForm() {
-            var content = $('textarea[name="body"]').html($('#body').code());
-        }
+        /*function postForm() {
+            var content = $('textarea[name="body"]').html($('#body').html());
+            console.log(content);
+            return content;
+        }*/
 
         counter = function () {
 
             var value = $('#body').code(); // $('#body').val();
-
+console.log(value);
             if (value.length == 0) {
                 $('#totalWords').html(0);
                 $('#totalChars').html(0);
@@ -120,17 +125,41 @@
                 height: "15em",
                 toolbar: [
                     ['style', ['bold', 'italic', 'underline', 'strikethrough', 'clear']],
-                    ['fancy', ['link']], /* Images forthcoming */
+                    ['fancy', ['link', 'picture']],
+                    /* Images forthcoming */
                     ['fontsize', ['fontsize']],
                     ['color', ['color']],
                     ['para', ['ul', 'ol', 'paragraph']],
-                    ['codeview',['fullscreen','codeview']]
+                    ['codeview', ['fullscreen', 'codeview']]
                 ],
-                onkeyup: counter
+                onkeyup: counter,
+                onImageUpload: function(files, editor, welEditable)
+                {
+                    console.log(files);
+                    uploadFileAsync(files[0], editor, welEditable);
+                }
             });
-        });
+        })
+        ;
+
+        function uploadFileAsync(file, editor, welEditable) {
+            data = new FormData();
+            data.append("file", file);
+            $.ajax({
+                data: data,
+                type: "POST",
+                url: "<?=\Idno\Core\site()->config()->getURL()?>file/upload/",
+                cache: false,
+                contentType: false,
+                processData: false,
+                success: function (url) {
+                    console.log("Success! " + url);
+                    editor.insertImage(welEditable, url);
+                }
+            });
+        }
 
         // Autosave the title & body
-        autoSave('entry', ['title', 'body']);
+        //autoSave('entry', ['title', 'body']);
     </script>
 <?= $this->draw('entity/edit/footer'); ?>

@@ -42,6 +42,7 @@
                 }
                 $this->title = \Idno\Core\site()->currentPage()->getInput('title');
                 $this->body  = \Idno\Core\site()->currentPage()->getInput('body');
+                $this->tags  = \Idno\Core\site()->currentPage()->getInput('tags');
                 $this->setAccess('PUBLIC');
 
                 if ($time = \Idno\Core\site()->currentPage()->getInput('created')) {
@@ -52,6 +53,9 @@
 
                 // This is awful, but unfortunately, browsers can't be trusted to send the right mimetype.
                 $ext = pathinfo($_FILES['media']['name'], PATHINFO_EXTENSION);
+
+                // This flag will tell us if it's safe to save the object later on
+                $ok = false;
 
                 // Get media
                 if ($new) {
@@ -70,7 +74,7 @@
                         ) {
                             $media_file = $_FILES['media'];
                             if ($media_file['type'] == 'application/octet-stream') {
-                                switch ($media_file['type']) {
+                                switch ($ext) {
                                     case 'mp4':
                                         $media_file['type'] = 'video/mp4';
                                         break;
@@ -96,6 +100,7 @@
                             }
                             if ($media = \Idno\Entities\File::createFromFile($media_file['tmp_name'], $media_file['name'], $media_file['type'], true)) {
                                 $this->attachFile($media);
+                                $ok = true;
                             } else {
                                 \Idno\Core\site()->session()->addMessage('Media wasn\'t attached.');
                             }
@@ -109,13 +114,18 @@
                     }
                 }
 
+                // If a media file wasn't attached, don't save the file.
+                if (!$ok) {
+                    return false;
+                }
+
                 $this->media_type = $_FILES['media']['type'];
 
                 if ($this->save()) {
                     if ($new) {
                         $this->addToFeed();
                     } // Add it to the Activity Streams feed
-                    \Idno\Core\Webmention::pingMentions($this->getURL(), \Idno\Core\site()->template()->parseURLs($this->getDescription()));
+                    \Idno\Core\Webmention::pingMentions($this->getURL(), \Idno\Core\site()->template()->parseURLs($this->getTitle() . ' ' . $this->getDescription()));
 
                     return true;
                 } else {

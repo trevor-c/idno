@@ -25,11 +25,16 @@
             echo "<p>If you like, you can <a href=\"mailto:hello@withknown.com?subject=" .
                 rawurlencode("Fatal error in Known install at {$_SERVER['SERVER_NAME']}{$_SERVER['REQUEST_URI']}") . "&body=" . rawurlencode($error_message) . "\">email us for more information</a>.";
 
-            error_log($error_message);
+            \Idno\Core\site()->logging->log($error_message, LOGLEVEL_ERROR);
 
             exit;
         }
     });
+
+// Set time limit if we're using the default
+    if (ini_get('max_execution_time') == 30) {
+        set_time_limit(120);
+    }
 
 // We're making heavy use of the Symfony ClassLoader to load our classes
     require_once(dirname(dirname(__FILE__)) . '/external/Symfony/Component/ClassLoader/UniversalClassLoader.php');

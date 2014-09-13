@@ -91,11 +91,13 @@
                             }
                             $vars['object'] = $event->data()['object'];
 
-                            $email = new Email();
-                            $email->setSubject($event->data()['message']);
-                            $email->setHTMLBodyFromTemplate($event->data()['message_template'], $vars);
-                            $email->addTo($user->email);
-                            $email->send();
+                            if (filter_var($user->email, FILTER_VALIDATE_EMAIL)) {
+                                $email = new Email();
+                                $email->setSubject($event->data()['message']);
+                                $email->setHTMLBodyFromTemplate($event->data()['message_template'], $vars);
+                                $email->addTo($user->email);
+                                $email->send();
+                            }
 
                         }
 
@@ -116,6 +118,9 @@
                 $response = \Idno\Core\site()->triggerEvent('icon', array('object' => $this));
                 if (!empty($response) && $response !== true) {
                     return $response;
+                }
+                if (!empty($this->image)) {
+                    return $this->image;
                 }
                 if (!empty($this->icon)) {
                     return \Idno\Core\site()->config()->url . 'file/' . $this->icon;
@@ -148,6 +153,9 @@
              */
             function getURL()
             {
+                if (!empty($this->url)) {
+                    return $this->url;
+                }
                 return \Idno\Core\site()->config()->url . 'profile/' . $this->getHandle();
             }
 
@@ -686,6 +694,7 @@
             {
 
                 if (!$this->canEdit()) return false;
+
                 $this->profile = \Idno\Core\site()->currentPage()->getInput('profile');
                 if ($name = \Idno\Core\site()->currentPage()->getInput('name')) {
                     $this->setName($name);
@@ -693,7 +702,7 @@
                 if (!empty($_FILES['avatar'])) {
                     if (in_array($_FILES['avatar']['type'], array('image/png', 'image/jpg', 'image/jpeg', 'image/gif'))) {
                         if (getimagesize($_FILES['avatar']['tmp_name'])) {
-                            if ($icon = \Idno\Entities\File::createThumbnailFromFile($_FILES['avatar']['tmp_name'], $_FILES['avatar']['name'], 300)) {
+                            if ($icon = \Idno\Entities\File::createThumbnailFromFile($_FILES['avatar']['tmp_name'], $_FILES['avatar']['name'], 300, true)) {
                                 $this->icon = (string)$icon;
                             } else if ($icon = \Idno\Entities\File::createFromFile($_FILES['avatar']['tmp_name'], $_FILES['avatar']['name'])) {
                                 $this->icon = (string)$icon;

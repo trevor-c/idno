@@ -5,7 +5,9 @@
         class RSVP extends \Idno\Common\Entity {
 
             function getTitle() {
-                if (!empty($this->body)) return $this->body;
+                if (!empty($this->body)) {
+                    return ucfirst($this->rsvp) . ': ' . $this->body;
+                }
                 return '';
             }
 
@@ -21,6 +23,14 @@
             }
 
             function getURL() {
+                // If we have a URL override, use it
+                if (!empty($this->url)) {
+                    return $this->url;
+                }
+
+                if (!empty($this->canonical)) {
+                    return $this->canonical;
+                }
                 if (!($this->getSlug()) && ($this->getID())) {
                     return \Idno\Core\site()->config()->url . 'rsvp/' . $this->getID() . '/';
                 } else {
@@ -33,7 +43,7 @@
              * @return 'article'
              */
             function getActivityStreamsObjectType() {
-                return 'note';
+                return 'rsvp';
             }
 
             /**

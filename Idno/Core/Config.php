@@ -23,12 +23,17 @@
                                               'Text',
                                               'Photo',
                                               'Like',
-                                              'Checkin'
+                                              'Checkin',
+                                              'Media'
                 ),
                 'themes'            => [],
+                'antiplugins'       => [],
+                'alwaysplugins'     => [],
                 'items_per_page'    => 10, // Default items per page
                 'experimental'      => false, // A common way to enable experimental functions still in development
-                'multitenant'       => false
+                'multitenant'       => false,
+                'default_config'    => true, // This is a trip-switch - changed to true if configuration is loaded from an ini file / the db
+                'log_level'         => 4
             );
 
             public $ini_config = [];
@@ -46,20 +51,36 @@
                 $this->feed               = $this->url . '?_t=rss';
                 $this->indieweb_citation  = false;
                 $this->indieweb_reference = false;
+                $this->known_hub          = false;
 
                 $this->loadIniFiles();
 
                 if ($this->multitenant) {
-                    $dbname       = $this->dbname;
-                    $this->host   = str_replace('www.', '', $this->host);
-                    $this->dbname = preg_replace('/[^\da-z\.]/i', '', $this->host);
+                    $dbname            = $this->dbname;
+                    $this->host        = str_replace('www.', '', $this->host);
+                    //$this->sessionname = preg_replace('/[^\da-z]/i', '', $this->host);
+                    $this->dbname      = preg_replace('/[^0-9a-z\.\-\_]/i', '', $this->host);
+
+                    // Known now defaults to not including periods in database names for multitenant installs. Add
+                    // 'multitenant_periods = true' if you wish to override this.
+                    if (empty($this->multitenant_periods)) {
+                        $this->dbname      = str_replace('.', '_', $this->dbname);
+                    }
+
                     if (empty($this->dbname)) {
                         $this->dbname = $dbname;
                     }
                 }
 
-                if ($this->initial_plugins) {
-                    $this->plugins = $this->initial_plugins;
+                if (!empty($this->initial_plugins)) {
+                    if (!empty($this->default_plugins)) {
+                        $this->default_plugins = array_merge($this->default_plugins, $this->initial_plugins);
+                    } else {
+                        $this->default_plugins = $this->initial_plugins;
+                    }
+                }
+                if (!empty($this->default_plugins)) {
+                    $this->plugins = $this->default_plugins;
                 }
 
                 date_default_timezone_set($this->timezone);
@@ -79,6 +100,9 @@
                     }
                     // Per domain configuration
                     if ($config = @parse_ini_file($this->path . '/' . $this->host . '.ini')) {
+                        unset($this->ini_config['initial_plugins']);  // Don't let plugin settings be merged
+                        unset($this->ini_config['alwaysplugins']);
+                        unset($this->ini_config['antiplugins']);
                         $this->ini_config = array_merge($config, $this->ini_config);
                     }
                     if (file_exists($this->path . '/config.json')) {
@@ -91,7 +115,8 @@
                 }
 
                 if (!empty($this->ini_config)) {
-                    $this->config = array_merge($this->config, $this->ini_config);
+                    $this->config         = array_merge($this->config, $this->ini_config);
+                    $this->default_config = false;
                 }
 
             }
@@ -102,12 +127,9 @@
              * a configuration value.
              */
 
-            function __get($name)
+            function &__get($name)
             {
-                if (isset($this->config[$name]))
-                    return $this->config[$name];
-
-                return null;
+                return $this->config[$name];
             }
 
             /**
@@ -168,6 +190,7 @@
             function load()
             {
                 if ($config = \Idno\Core\site()->db()->getAnyRecord('config')) {
+                    $this->default_config = false;
                     if ($config instanceof \Idno\Common\Entity) {
                         $config = $config->getAttributes();
                         unset($config['dbname']); // Ensure we don't accidentally load protected data from db
@@ -176,6 +199,9 @@
                         unset($config['host']);
                         unset($config['feed']);
                         unset($config['uploadpath']);
+                        unset($config['initial_plugins']);
+                        unset($config['antiplugins']);
+                        unset($config['alwaysplugins']);
                     }
                     if (is_array($config)) {
                         $this->config = array_merge($this->config, $config);
@@ -198,12 +224,38 @@
             }
 
             /**
+             * Retrieve the name of this site
+             * @return string
+             */
+            function getTitle()
+            {
+                if (!empty($this->title)) {
+                    return $this->title;
+                }
+
+                return '';
+            }
+
+            /**
              * Is this site's content available to non-members?
              * @return bool
              */
             function isPublicSite()
             {
                 if (empty($this->walled_garden)) {
+                    return true;
+                }
+
+                return false;
+            }
+
+            /**
+             * Is this the default site configuration?
+             * @return bool
+             */
+            function isDefaultConfig()
+            {
+                if ($this->default_config) {
                     return true;
                 }
 

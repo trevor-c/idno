@@ -68,6 +68,8 @@
                         $page->exception($exception);
 
                 });
+
+                \Idno\Core\site()->embedded();
             }
 
             /**
@@ -377,6 +379,7 @@
                     if (\Idno\Core\site()->template()->getTemplateType() != 'default') {
                         $location = \Idno\Core\site()->template()->getURLWithVar('_t', \Idno\Core\site()->template()->getTemplateType(), $location);
                     }
+                    \Idno\Core\site()->session()->finishEarly();
                     header('Location: ' . $location);
                     exit;
                 }

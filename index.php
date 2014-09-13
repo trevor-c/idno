@@ -14,6 +14,11 @@
      * @subpackage core
      */
 
+// Check PHP version first of all
+    if (version_compare(phpversion(), '5.4', '<')) {
+        header('Location: warmup/'); exit;
+    }
+
 // Load the idno framework
 
     require_once(dirname(__FILE__) . '/Idno/start.php');
@@ -32,7 +37,6 @@
     if (!empty($path)) {
         $routes[$path . '/'] = $routes['/'];
     }
-
 
 // Manage routing
 

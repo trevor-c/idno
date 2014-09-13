@@ -48,6 +48,14 @@
             }
 
             /**
+             * Kill the session.
+             */
+            function finishEarly()
+            {
+                session_write_close();
+            }
+
+            /**
              * Get the UUID of the currently logged-in user, or false if
              * we're logged out
              *
@@ -112,6 +120,14 @@
                     $_SESSION['messages'] = [];
                 }
                 $_SESSION['messages'][] = array('message' => $message, 'message_type' => $message_type);
+            }
+            
+            /**
+             * Error message wrapper for addMessage()
+             * @param type $message
+             */
+            function addErrorMessage($message) {
+                $this->addMessage($message, 'alert-error');
             }
 
             /**
@@ -298,16 +314,11 @@
 
             function logUserOn(\Idno\Entities\User $user)
             {
-                if (empty($user->notifications)) {
-                    $user->notifications['email'] = 'all'; // By default, send notifications to users
-                }
-                if (empty($user->icon_number)) {
-                    $user->icon_number = rand(1,6);
-                }
+                $return = $this->refreshSessionUser($user);
 
-                $user->save();
+                \Idno\Core\site()->triggerEvent('user/auth', ['user' => $user]);
 
-                return $this->refreshSessionUser($user);
+                return $return;
             }
 
             /**
@@ -318,11 +329,7 @@
             function refreshSessionUser(\Idno\Entities\User $user)
             {
                 if ($user = User::getByUUID($user->getUUID())) {
-                    /* @var \Idno\Common\User $user */
-                    $user->clearPasswordRecoveryCode();
-                    $user->save();
                     $_SESSION['user'] = $user;
-
                     return $user;
                 }
 

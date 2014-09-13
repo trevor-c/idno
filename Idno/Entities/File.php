@@ -102,9 +102,10 @@
              * @param string $file_path Path to the file.
              * @param string $filename Filename that the file should have on download.
              * @param int $max_dimension The maximum number of pixels the thumbnail image should be along its longest side.
+             * @param bool $square If this is set to true, the thumbnail will be made square.
              * @return bool|id
              */
-            public static function createThumbnailFromFile($file_path, $filename, $max_dimension = 800)
+            public static function createThumbnailFromFile($file_path, $filename, $max_dimension = 800, $square = false)
             {
 
                 $thumbnail = false;
@@ -117,14 +118,12 @@
                                 break;
                             case 'image/png':
                                 $image      = imagecreatefrompng($file_path);
-                                $background = imagecolorallocate($image, 0, 0, 0);
+                                $background = imagecolorallocatealpha($image, 0, 0, 0, 127);
                                 imagecolortransparent($image, $background);
-                                imagealphablending($image, false);
-                                imagesavealpha($image, true);
                                 break;
                             case 'image/gif':
                                 $image      = imagecreatefromgif($file_path);
-                                $background = imagecolorallocate($image, 0, 0, 0);
+                                $background = imagecolorallocatealpha($image, 0, 0, 0, 127);
                                 imagecolortransparent($image, $background);
                                 break;
                         }
@@ -136,23 +135,53 @@
                                 $height = $max_dimension;
                                 $width  = round($photo_information[0] * ($max_dimension / $photo_information[1]));
                             }
-                            $image_copy = imagecreatetruecolor($width, $height);
-                            imagecopyresampled($image_copy, $image, 0, 0, 0, 0, $width, $height, $photo_information[0], $photo_information[1]);
+                            if ($square) {
+                                if ($width > $height) {
+                                    $new_height = $max_dimension;
+                                    $new_width = $max_dimension;
+                                    $original_height = $photo_information[1];
+                                    $original_width = $photo_information[1];
+                                    $offset_x = round(($photo_information[0] - $photo_information[1]) / 2);
+                                    $offset_y = 0;
+                                } else {
+                                    $new_height = $max_dimension;
+                                    $new_width = $max_dimension;
+                                    $original_height = $photo_information[0];
+                                    $original_width = $photo_information[0];
+                                    $offset_x = 0;
+                                    $offset_y = round(($photo_information[0] - $photo_information[1]) / 2);
+                                }
+                            } else {
+                                $new_height = $height;
+                                $new_width = $width;
+                                $original_height = $photo_information[1];
+                                $original_width = $photo_information[0];
+                                $offset_x = 0;
+                                $offset_y = 0;
+                            }
+                            $image_copy = imagecreatetruecolor($new_width, $new_height);
+                            imagealphablending($image_copy, false);
+                            imagesavealpha($image_copy, true);
+                            imagecopyresampled($image_copy, $image, 0, 0, $offset_x, $offset_y, $new_width, $new_height, $original_width, $original_height);
 
-                            if (is_callable('exif_read_data')) {
-                                $exif = exif_read_data($file_path);
-                                if (!empty($exif['Orientation'])) {
-                                    switch ($exif['Orientation']) {
-                                        case 8:
-                                            $image_copy = imagerotate($image_copy, 90, 0);
-                                            break;
-                                        case 3:
-                                            $image_copy = imagerotate($image_copy, 180, 0);
-                                            break;
-                                        case 6:
-                                            $image_copy = imagerotate($image_copy, -90, 0);
-                                            break;
+                            if (is_callable('exif_read_data') && $photo_information['mime'] == 'image/jpeg') {
+                                try {
+                                    $exif = exif_read_data($file_path);
+                                    if (!empty($exif['Orientation'])) {
+                                        switch ($exif['Orientation']) {
+                                            case 8:
+                                                $image_copy = imagerotate($image_copy, 90, 0);
+                                                break;
+                                            case 3:
+                                                $image_copy = imagerotate($image_copy, 180, 0);
+                                                break;
+                                            case 6:
+                                                $image_copy = imagerotate($image_copy, -90, 0);
+                                                break;
+                                        }
                                     }
+                                } catch (\Exception $e) {
+                                    // Don't do anything
                                 }
                             }
 
@@ -208,7 +237,11 @@
             static function getByID($id)
             {
                 if ($fs = \Idno\Core\site()->filesystem()) {
-                    return $fs->findOne(array('_id' => \Idno\Core\site()->db()->processID($id)));
+                    try {
+                        return $fs->findOne(array('_id' => \Idno\Core\site()->db()->processID($id)));
+                    } catch (\Exception $e) {
+                        \Idno\Core\site()->logging->log($e->getMessage(), LOGLEVEL_ERROR);
+                    }
                 }
 
                 return false;
@@ -222,7 +255,48 @@
             static function getFileDataByID($id)
             {
                 if ($file = self::getByID($id)) {
-                    return $file->getBytes();
+                    try {
+                        return $file->getBytes();
+                    } catch (\Exception $e) {
+                        \Idno\Core\site()->logging->log($e->getMessage(), LOGLEVEL_ERROR);
+                    }
+                }
+
+                return false;
+            }
+
+            /**
+             * Retrieve file data from an attachment (first trying load from local storage, then from URL)
+             * @param $attachment
+             * @return bool|mixed|string
+             */
+            static function getFileDataFromAttachment($attachment) {
+                \Idno\Core\site()->logging->log(json_encode($attachment), LOGLEVEL_DEBUG);
+                if (!empty($attachment['_id'])) {
+                    \Idno\Core\site()->logging->log("Checking attachment ID", LOGLEVEL_DEBUG);
+                    if ($bytes = self::getFileDataByID((string)$attachment['_id'])) {
+                        \Idno\Core\site()->logging->log("Retrieved some bytes", LOGLEVEL_DEBUG);
+                        if (strlen($bytes)) {
+                            \Idno\Core\site()->logging->log("Bytes! " . $bytes, LOGLEVEL_DEBUG);
+                            return $bytes;
+                        } else {
+                            \Idno\Core\site()->logging->log("Sadly no bytes", LOGLEVEL_DEBUG);
+                        }
+                    } else {
+                        \Idno\Core\site()->logging->log("No bytes retrieved", LOGLEVEL_DEBUG);
+                    }
+                } else {
+                    \Idno\Core\site()->logging->log("Empty attachment _id", LOGLEVEL_DEBUG);
+                }
+                if (!empty($attachment['url'])) {
+                    if ($bytes = file_get_contents($attachment['url'])) {
+                        \Idno\Core\site()->logging->log("Returning bytes", LOGLEVEL_DEBUG);
+                        return $bytes;
+                    } else {
+                        \Idno\Core\site()->logging->log("Couldn't get bytes from " . $attachment['url'], LOGLEVEL_DEBUG);
+                    }
+                } else {
+                    \Idno\Core\site()->logging->log('Attachment url was empty ' . $attachment['url'], LOGLEVEL_DEBUG);
                 }
 
                 return false;
