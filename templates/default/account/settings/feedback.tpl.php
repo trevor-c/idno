@@ -4,20 +4,18 @@
         <h1>
             Share your feedback
         </h1>
-        <?= $this->draw('account/menu') ?>
-        <p>
-            <em>Want to share something with the Known team? We'd love to read your thoughts, suggestions, or ideas.</em>
+        <!--<?= $this->draw('account/menu') ?>-->
+        <p class="explanation">
+            Want to share something with the Known team? We'd love to read your thoughts, suggestions, or ideas.
         </p>
-        <hr>
 
     </div>
 </div>
 
+<form class="form-horizontal" action="<?= \Idno\Core\site()->config()->getURL() ?>account/settings/feedback"
+      method="post">
 <div class="row">
     <div class="span10 offset1">
-
-        <form class="form-horizontal" action="<?= \Idno\Core\site()->config()->getURL() ?>account/settings/feedback"
-              method="post">
 
             <p class="feedback">
                 <strong>From:</strong> <?= \Idno\Core\site()->session()->currentUser()->email ?>
@@ -34,8 +32,7 @@
                 <textarea rows="7" class="feedback" placeholder="Let us know what you think." name="message" required></textarea>
 
                 <p>
-                    <em>We will personally read all of your feedback. This form receives your email address so that we
-                    can respond, but we won't add your address to any list.</em>
+                    <em>We will personally read all of your feedback.</em>
                 </p>
 
                 <div class="control-group">
@@ -45,5 +42,7 @@
                     </div>
                 </div>
 
-        </form>
+
     </div>
+
+</form>

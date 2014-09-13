@@ -5,6 +5,7 @@
      */
 
     namespace Idno\Pages\Account {
+        use Idno\Entities\Invitation;
 
         /**
          * Default class to serve the registration page
@@ -53,7 +54,8 @@
                         \Idno\Core\site()->session()->addMessage("Your invitation doesn't seem to be valid or has expired.");
                         $this->forward(\Idno\Core\site()->config()->getURL());
                     } else {
-                        $invitation->delete(); // Remove the invitation; it's no longer needed
+                        // Removing this from here - invitation will be deleted once user is created
+                        //$invitation->delete(); // Remove the invitation; it's no longer needed
                     }
                 }
 
@@ -75,14 +77,24 @@
                         $user->setTitle($name);
                         if (!\Idno\Entities\User::get()) {
                             $user->setAdmin(true);
+                            $user->robot_state = 1; // State for our happy robot helper
                             if (\Idno\Core\site()->config()->title == 'New Known site') {
-                                \Idno\Core\site()->config()->title = $user->getTitle() . '\'s site';
+                                if (!empty($_SESSION['set_name'])) {
+                                    \Idno\Core\site()->config()->title = $_SESSION['set_name'];
+                                } else {
+                                    \Idno\Core\site()->config()->title = $user->getTitle() . '\'s Known';
+                                }
                                 \Idno\Core\site()->config()->open_registration = false;
                                 \Idno\Core\site()->config()->from_email = $user->email;
                                 \Idno\Core\site()->config()->save();
                             }
                         }
                         $user->save();
+                        \Idno\Core\site()->triggerEvent('site/firstadmin',['user' => $user]); // Event hook for first admin
+                        // Now we can remove the invitation
+                        if ($invitation instanceof Invitation) {
+                            $invitation->delete(); // Remove the invitation; it's no longer needed
+                        }
                     } else {
                         if (empty($handle)) {
                             \Idno\Core\site()->session()->addMessage("Please create a username.");
