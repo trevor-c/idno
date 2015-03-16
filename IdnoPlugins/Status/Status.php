@@ -5,7 +5,11 @@
         class Status extends \Idno\Common\Entity {
 
             function getTitle() {
-                return $this->getShortDescription();
+                $title = trim($this->getShortDescription());
+                if (empty($title)) {
+                    $title = 'Status update';
+                }
+                return $title;
             }
 
             function getDescription() {
@@ -70,15 +74,12 @@
                         }
                     }
                     $this->setAccess('PUBLIC');
-                    if ($this->save()) {
-                        if ($new) {
-                            $this->addToFeed();
-                        } // Add it to the Activity Streams feed
+                    if ($this->save($new)) {
                         \Idno\Core\Webmention::pingMentions($this->getURL(), \Idno\Core\site()->template()->parseURLs($this->getDescription()));
                         return true;
                     }
                 } else {
-                    \Idno\Core\site()->session()->addMessage('You can\'t save an empty status update.');
+                    \Idno\Core\site()->session()->addErrorMessage('You can\'t save an empty status update.');
                 }
                 return false;
 

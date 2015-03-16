@@ -15,10 +15,16 @@
         {
 
             // We'll keep track of extensions to templates here
-            public $extensions = [];
+            public $extensions = array();
+
+            // We'll keep track of prepended templates here
+            public $prepends = array();
+
+            // We'll keep track of replaced templates here
+            public $replacements = array();
 
             // We can also extend templates with HTML or other content
-            public $rendered_extensions = [];
+            public $rendered_extensions = array();
 
             /**
              * On construction, detect the template type
@@ -36,12 +42,23 @@
              * Extension-aware version of the template drawing function
              *
              * @param string $templateName
-             * @param bool $returnBlank
+             * @param bool $returnBlank Should we return a blank string if the template doesn't exist? (Defaults to true)
+             * @param book $replacements Should we honor template replacements? (Defaults to true)
              * @return \Bonita\false|string
              */
-            function draw($templateName, $returnBlank = true)
+            function draw($templateName, $returnBlank = true, $replacements = true)
             {
-                $result = parent::draw($templateName, $returnBlank);
+                $result = '';
+                if (!empty($this->prepends[$templateName])) {
+                    foreach ($this->prepends[$templateName] as $template) {
+                        $result .= parent::draw($template, $returnBlank);
+                    }
+                }
+                if (!empty($this->replacements[$templateName]) && $replacements == true) {
+                    $result .= parent::draw($this->replacements[$templateName], $returnBlank);
+                } else {
+                    $result .= parent::draw($templateName, $returnBlank);
+                }
                 if (!empty($this->extensions[$templateName])) {
                     foreach ($this->extensions[$templateName] as $template) {
                         $result .= parent::draw($template, $returnBlank);
@@ -79,7 +96,7 @@
              */
             function drawSyndication($content_type)
             {
-                return $this->__(['services' => \Idno\Core\site()->syndication()->getServices($content_type), 'content_type' => $content_type])->draw('content/syndication');
+                return $this->__(array('services' => \Idno\Core\site()->syndication()->getServices($content_type), 'content_type' => $content_type))->draw('content/syndication');
             }
 
             /**
@@ -97,7 +114,7 @@
                 if ($offset == 0 && $count < $items_per_page) {
                     return '';
                 } else {
-                    return $this->__(['count' => $count, 'offset' => $offset, 'items_per_page' => $items_per_page])->draw('shell/pagination');
+                    return $this->__(array('count' => $count, 'offset' => $offset, 'items_per_page' => $items_per_page))->draw('shell/pagination');
                 }
 
             }
@@ -115,13 +132,55 @@
             function extendTemplate($templateName, $extensionTemplateName, $to_front = false)
             {
                 if (empty($this->extensions[$templateName])) {
-                    $this->extensions[$templateName] = [];
+                    $this->extensions[$templateName] = array();
                 }
                 if ($to_front) {
                     array_unshift($this->extensions[$templateName], $extensionTemplateName);
                 } else {
                     $this->extensions[$templateName][] = $extensionTemplateName;
                 }
+            }
+
+            /**
+             * Prepend a template with another template. eg, template "plugin/atemplate"
+             * could extend "core/atemplate"; if this is the case, the results of
+             * $template->draw('plugin/atemplate') will be automatically prepended to
+             * the end of the results of $template->draw('core/atemplate').
+             *
+             * @param string $templateName
+             * @param string $prependTemplateName
+             * @param bool $to_front If set, this will add the template to the beginning of the template queue
+             */
+            function prependTemplate($templateName, $prependTemplateName, $to_front = false)
+            {
+                if (empty($this->prepends[$templateName])) {
+                    $this->prepends[$templateName] = array();
+                }
+                if ($to_front) {
+                    array_unshift($this->prepends[$templateName], $prependTemplateName);
+                } else {
+                    $this->prepends[$templateName][] = $prependTemplateName;
+                }
+            }
+
+            /**
+             * Replace a core template with another template. eg, template "plugin/atemplate"
+             * could replace "core/atemplate"; if this is the case, the results of
+             * $template->draw('plugin/atemplate') will be displayed instead of
+             * $template->draw('core/atemplate'). Usually this isn't required - Known replaces
+             * templates automatically if you create one in your plugin with the same name -
+             * but this function enables conditional replacements.
+             *
+             * @param string $templateName
+             * @param string $extensionTemplateName
+             * @param bool $to_front If set, this will add the template to the beginning of the template queue
+             */
+            function replaceTemplate($templateName, $replacementTemplateName)
+            {
+                if (empty($this->replacements[$templateName])) {
+                    $this->replacements[$templateName] = array();
+                }
+                $this->replacements[$templateName] = $replacementTemplateName;
             }
 
             /**
@@ -146,10 +205,29 @@
              */
             function autop($html)
             {
+                $html = site()->triggerEvent('text/format', [], $html);
                 require_once dirname(dirname(dirname(__FILE__))) . '/external/MrClay_AutoP/AutoP.php';
                 $autop = new \MrClay_AutoP();
+                
+                return $this->sanitize_html($autop->process($html));
+            }
+            
+            /**
+             * Sanitize HTML in a large block of text, removing XSS and other vulnerabilities.
+             * This works by calling the text/filter event, note that currently there is no native implementation.
+             * @param type $html
+             */
+            function sanitize_html($html) {
+                return site()->triggerEvent('text/filter', [], $html);
+            }
 
-                return $autop->process($html);
+            /**
+             * Wrapper for those on UK spelling.
+             * @param $html
+             * @return mixed
+             */
+            function sanitise_html($html) {
+                return $this->sanitize_html($html);
             }
 
             /**
@@ -187,10 +265,15 @@
              */
             function parseHashtags($text)
             {
-                $r = preg_replace_callback('/(?<!=)(?<!["\'])(\#[A-Za-z0-9]+)/i', function ($matches) {
-                    $url = ($matches[1]);
+                $r = preg_replace_callback('/(?<=^|[\>\s\n])(\#[\w0-9]+)/iu', function($matches) {
+                    $url = $matches[1];
+                    $tag = str_replace('#','',$matches[1]);
 
-                    return '<a href="' . \Idno\Core\site()->config()->url . 'content/all/?q=' . urlencode($matches[1]) . '" class="p-category">' . $url . '</a>';
+                    if (preg_match('/\#[A-Fa-f0-9]{6}/', $matches[1])) {
+                        return $matches[1];
+                    }
+
+                    return '<a href="' . \Idno\Core\site()->config()->getDisplayURL() . 'tag/' . urlencode($tag) . '" class="p-category" rel="tag">' . $url . '</a>';
                 }, $text);
 
                 return $r;
@@ -211,10 +294,28 @@
                     substr($url, 0, 4) == 'tel:' ||
                     substr($url, 0, 4) == 'sms:' ||
                     substr($url, 0, 6) == 'skype:' ||
-                    substr($url, 0, 5) == 'xmpp:'
+                    substr($url, 0, 5) == 'xmpp:' ||
+                    substr($url, 0, 5) == 'facetime:'
                 )
                     ? $url
                     : 'http://' . $url;
+            }
+
+            /**
+             * Return a schema-less version of the given URL
+             *
+             * @param $url
+             * @return mixed
+             */
+            function makeDisplayURL($url)
+            {
+                $scheme = parse_url($url, PHP_URL_SCHEME);
+                if (site()->isSecure()) {
+                    $newuri = 'https:';
+                } else {
+                    $newuri = 'http:';
+                }
+                return str_replace($scheme . ':', $newuri, $url);
             }
 
             /**
@@ -237,7 +338,7 @@
                         if (is_array($in_reply_to))
                             $in_reply_to = $in_reply_to[0];
 
-                        $r = preg_replace_callback('/(?<!=)(?<!["\'])(\@[A-Za-z0-9\_]+)/i', function ($matches) use ($in_reply_to) {
+                        $r = preg_replace_callback('/(?<=^|[\>\s\n])(\@[\w0-9\_]+)/i', function ($matches) use ($in_reply_to) {
                             $url = $matches[1];
 
                             // Find and replace twitter
@@ -252,7 +353,7 @@
 
                 } else {
                     // No in-reply, so we assume a local user
-                    $r = preg_replace_callback('/(?<!=)(?<!["\'])(\@[A-Za-z0-9\_]+)/i', function ($matches) {
+                    $r = preg_replace_callback('/(?<=^|[\>\s\n])(\@[A-Za-z0-9\_]+)/i', function ($matches) {
                         $url = $matches[1];
 
                         $username = ltrim($matches[1], '@');
@@ -310,7 +411,7 @@
                     if (!empty($components['query'])) {
                         parse_str($components['query'], $url_var_array);
                     } else {
-                        $components['query'] = [];
+                        $components['query'] = array();
                     }
                     $url_var_array[$variable_name] = $variable_value;
                     $components['query']           = http_build_query($url_var_array);

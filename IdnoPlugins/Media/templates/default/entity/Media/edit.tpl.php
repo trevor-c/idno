@@ -26,7 +26,7 @@
                 ?>
                 <label>
                     <span class="btn btn-primary btn-file">
-                        <i class="icon-play-circle"></i> <span id="media-filename">Upload media</span> <input type="file" name="media" id="media" class="span9" accept="audio/*;video/*;capture=audio" onchange="$('#media-filename').html($(this).val())" />
+                        <i class="icon-play-circled"></i> <span id="media-filename">Upload media</span> <input type="file" name="media" id="media" class="span9" accept="audio/*;video/*;capture=audio" onchange="$('#media-filename').html($(this).val())" />
                     </span>
                 </label>
                 <?php
@@ -47,11 +47,7 @@
                     <textarea name="body" id="description" placeholder="What's this about?" class="span8 bodyInput"><?=htmlspecialchars($vars['object']->body)?></textarea>
                 </label>
             </p>
-                <label>
-                     Tags<br/>
-                     <input type="text" name="tags" id="tags" placeholder="Add some #tags"
-                               value="<?= htmlspecialchars($vars['object']->tags) ?>" class="span8"/>
-                </label>
+            <?=$this->draw('entity/tags/input');?>
             <?php if (empty($vars['object']->_id)) echo $this->drawSyndication('media'); ?>
             <p class="button-bar ">
                 <?= \Idno\Core\site()->actions()->signForm('/media/edit') ?>

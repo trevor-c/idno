@@ -26,19 +26,12 @@
                 // Users own their own profiles
                 $this->setOwner($user);
 
-                // Get content types
-                $types = $user->getDefaultContentTypes();
-                if (empty($types)) {
-                    $types          = 'Idno\Entities\ActivityStreamPost';
-                    $search['verb'] = 'post';
-                } else {
-                    if (!is_array($types)) $types = [$types];
-                    $types[] = '!Idno\Entities\ActivityStreamPost';
-                }
+                $types          = 'Idno\Entities\ActivityStreamPost';
+                $search['verb'] = 'post';
 
                 $offset = (int)$this->getInput('offset');
-                $count  = \Idno\Entities\ActivityStreamPost::countFromX($types, ['owner' => $user->getUUID()]);
-                $feed   = \Idno\Entities\ActivityStreamPost::getFromX($types, ['owner' => $user->getUUID()], [], \Idno\Core\site()->config()->items_per_page, $offset);
+                $count  = \Idno\Entities\ActivityStreamPost::countFromX($types, array('owner' => $user->getUUID()));
+                $feed   = \Idno\Entities\ActivityStreamPost::getFromX($types, array('owner' => $user->getUUID()), array(), \Idno\Core\site()->config()->items_per_page, $offset);
 
                 $last_modified = $user->updated;
                 if (!empty($feed) && is_array($feed)) {

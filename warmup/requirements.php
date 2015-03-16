@@ -21,7 +21,7 @@
 
             <?php
 
-                if (version_compare(phpversion(), '5.4.0') >= 0) {
+                if (version_compare(phpversion(), '5.4') >= 0) {
                     $class = 'success';
                     $text = 'You are running PHP version ' . phpversion() . '.';
                 } else {
@@ -75,7 +75,7 @@
                 <?php
                 }
 
-                $extensions = ['curl','date','dom','fileinfo','gd','intl','json','libxml','mbstring','mysql','oauth','reflection','session','simplexml', 'xmlrpc'];
+                $extensions = array('curl','date','dom','gd','json','libxml','mbstring','mysql','reflection','session','simplexml');
                 asort($extensions);
                 foreach($extensions as $extension) {
                     if (extension_loaded($extension)) {
@@ -111,6 +111,9 @@
             <p>
                 <a class="btn btn-primary btn-lg btn-responsive" href="settings.php">Hooray! Let's get you set up.</a>
             </p>
+            <p>
+                <small><a href="http://docs.withknown.com/">Want to get set up manually? Here's our documentation.</a></small>
+            </p>
         </div>
     <?php
 
@@ -123,8 +126,11 @@
             </h2>
             <p>
                 Unfortunately it looks like you need to install a few things. If you need to, ask your system administrator.
-                Scroll up for more details, and <a href="http://withknown.com">check out our website</a> for more services
+                Scroll up for more details, and <a href="https://withknown.com">check out our website</a> for more services
                 and information.
+            </p>
+            <p>
+                <small><a href="http://docs.withknown.com/">Want more information? Here's our documentation.</a></small>
             </p>
         </div>
     <?php

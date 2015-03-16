@@ -19,7 +19,7 @@
                     \Idno\Core\site()->session()->addMessage($messages);
                 }
                 $t        = \Idno\Core\site()->template();
-                $t->body  = $t->__(['vendor_messages' => $messages])->draw('admin/home');
+                $t->body  = $t->__(array('vendor_messages' => $messages))->draw('admin/home');
                 $t->title = 'Administration';
                 $t->drawPage();
 
@@ -47,7 +47,7 @@
                 } else {
                     $open_registration = false;
                 }
-                if ($walled_garden == 'true') {
+                if ($walled_garden == 'true' && \Idno\Core\site()->config()->canMakeSitePrivate()) {
                     $walled_garden = true;
                 } else {
                     $walled_garden = false;

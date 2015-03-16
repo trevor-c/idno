@@ -9,21 +9,14 @@ Core team
 * Ben Werdmuller http://werd.io
 * Erin Jo Richey http://erinjo.is
 
-Homepage: http://withknown.com/
+Homepage: https://withknown.com/
 
 Team Known site: http://stream.withknown.com/
 
-Community contributors, by Known release
-----------------------------------------
+Community contributors
+----------------------
 
-0.1
-
-* Marcus Povey http://marcus-povey.co.uk
-* Tim Owens http://timowens.io
-* Jesse Vincent http://s.ly
-* Adrian Goins http://arces.net
-* Hugo Roy http://hroy.eu/
-* Barnaby Walters http://waterpigs.co.uk/
+https://github.com/idno/Known/graphs/contributors
 
 How can I contribute?
 ---------------------

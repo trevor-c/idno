@@ -18,7 +18,23 @@
 
             function registerPages()
             {
-                \Idno\Core\site()->addPageHandler('/webmention/?', '\Idno\Pages\Webmentions\Endpoint');
+                \Idno\Core\site()->addPageHandler('/webmention/?', '\Idno\Pages\Webmentions\Endpoint', true);
+            }
+
+            function registerEventHooks()
+            {
+
+                // Add webmention headers to the top of the page
+                \Idno\Core\site()->addEventHook('page/head', function (Event $event) {
+
+                    if (!empty(site()->config()->hub)) {
+                        $eventdata = $event->data();
+                        header('Link: <' . \Idno\Core\site()->config()->getDisplayURL() . 'webmention/>; rel="http://webmention.org/"', false);
+                        header('Link: <' . \Idno\Core\site()->config()->getDisplayURL() . 'webmention/>; rel="webmention"', false);
+                    }
+
+                });
+
             }
 
             /**
@@ -29,9 +45,15 @@
              */
             static function pingMentions($pageURL, $text)
             {
+
+                if ($current_page = site()->currentPage()) {
+                    if ($nowebmention = $current_page->getInput('nomention')) {
+                        return true;
+                    }
+                }
+
                 // Load webmention-client
                 require_once \Idno\Core\site()->config()->path . '/external/mention-client-php/src/IndieWeb/MentionClient.php';
-                
                 
                 // Proxy connection string provided
                 $proxystring = false;
@@ -39,9 +61,31 @@
                     $proxystring = \Idno\Core\site()->config()->proxy_string;
                 }
                 
-                $client = new \IndieWeb\MentionClient($pageURL, $text, $proxystring);
+                $client = new \Idno\Core\MentionClient($pageURL, $text, $proxystring);
 
                 return $client->sendSupportedMentions();
+            }
+
+            /**
+             * Does the supplied page support webmentions?
+             * @param $pageURL
+             * @param bool $sourceBody
+             * @return mixed
+             */
+            static function supportsMentions($pageURL, $sourceBody = false)
+            {
+                // Load webmention-client
+                require_once \Idno\Core\site()->config()->path . '/external/mention-client-php/src/IndieWeb/MentionClient.php';
+
+                // Proxy connection string provided
+                $proxystring = false;
+                if (!empty(\Idno\Core\site()->config()->proxy_string)) {
+                    $proxystring = \Idno\Core\site()->config()->proxy_string;
+                }
+
+                $client = new \Idno\Core\MentionClient($pageURL, $sourceBody, $proxystring);
+
+                return $client->supportsWebmention($pageURL);
             }
 
             /**
@@ -69,10 +113,10 @@
              * @param array $inreplyto
              * @return array
              */
-            static function addSyndicatedReplyTargets($url, $inreplyto = [])
+            static function addSyndicatedReplyTargets($url, $inreplyto = array())
             {
                 if (!is_array($inreplyto)) {
-                    $inreplyto = [$inreplyto];
+                    $inreplyto = array($inreplyto);
                 }
                 if ($content = \Idno\Core\Webservice::get($url)) {
                     if ($mf2 = self::parseContent($content['content'], $url)) {
@@ -91,6 +135,93 @@
                 }
 
                 return $inreplyto;
+            }
+
+            /**
+             * Given content, returns the type of action you can respond with
+             * @param $content
+             * @return string
+             */
+            static function getActionTypeFromHTML($content) {
+                $share_type = 'comment';
+                if ($mf2 = \Idno\Core\Webmention::parseContent($content['content'])) {
+                    if (!empty($mf2['items'])) {
+                        foreach ($mf2['items'] as $item) {
+                            if (!empty($item['type'])) {
+                                if (in_array('h-entry', $item['type'])) {
+                                    $share_type = 'reply';
+                                }
+                                if (in_array('h-event', $item['type'])) {
+                                    $share_type = 'rsvp';
+                                }
+                            }
+                        }
+                    }
+                }
+                return $share_type;
+            }
+
+            /**
+             * Given a URL, returns a user icon (or false)
+             * @param $url
+             * @return bool|string
+             */
+            static function getIconFromURL($url) {
+                if ($content = Webservice::get($url)) {
+                    return self::getIconFromWebsiteContent($content['content'], $url);
+                }
+                return false;
+            }
+
+            /**
+             * Retrieve a user's icon from a given homepage
+             * @param $content The content of the page
+             * @param $url The URL of the page
+             * @return $icon_url
+             */
+            static function getIconFromWebsiteContent($content, $url)
+            {
+                if ($mf2 = self::parseContent($content, $url)) {
+                    $mf2 = (array) $mf2;
+                    foreach ($mf2['items'] as $item) {
+
+                        // Figure out what kind of Microformats 2 item we have
+                        if (!empty($item['type']) && is_array($item['type'])) {
+                            foreach ($item['type'] as $type) {
+
+                                switch ($type) {
+                                    case 'h-card':
+                                        if (!empty($item['properties'])) {
+                                            if (!empty($item['properties']['name'])) $mentions['owner']['name'] = $item['properties']['name'][0];
+                                            if (!empty($item['properties']['url'])) $mentions['owner']['url'] = $item['properties']['url'][0];
+                                            if (!empty($item['properties']['photo'])) {
+                                                //$mentions['owner']['photo'] = $item['properties']['photo'][0];
+
+                                                $tmpfname = tempnam(sys_get_temp_dir(), 'webmention_avatar');
+                                                file_put_contents($tmpfname, \Idno\Core\Webservice::file_get_contents($item['properties']['photo'][0]));
+
+                                                $name = md5($item['properties']['url'][0]);
+
+                                                // TODO: Don't update the cache image for every webmention
+
+                                                if ($icon = \Idno\Entities\File::createThumbnailFromFile($tmpfname, $name, 300)) {
+                                                    return \Idno\Core\site()->config()->url . 'file/' . (string)$icon;
+                                                } else if ($icon = \Idno\Entities\File::createFromFile($tmpfname, $name)) {
+                                                    return \Idno\Core\site()->config()->url . 'file/' . (string)$icon;
+                                                }
+
+                                                unlink($tmpfname);
+                                            }
+                                        }
+                                        break;
+                                }
+
+                            }
+                        }
+
+                    }
+                }
+                return false;
             }
 
         }

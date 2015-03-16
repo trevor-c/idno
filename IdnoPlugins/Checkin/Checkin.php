@@ -61,16 +61,15 @@
                     $this->address   = $user_address;
                     $this->setAccess('PUBLIC');
                     $this->tags = $tags;
-                    if ($this->save()) {
+                    if ($this->save($new)) {
                         if ($new) {
-                            $this->addToFeed();
                             \Idno\Core\Webmention::pingMentions($this->getURL(), \Idno\Core\site()->template()->parseURLs($this->getTitle() . ' ' . $this->getDescription()));
                         }
 
                         return true;
                     }
                 } else {
-                    \Idno\Core\site()->session()->addMessage('You can\'t save an empty checkin.');
+                    \Idno\Core\site()->session()->addErrorMessage('You can\'t save an empty checkin.');
                 }
 
                 return false;
@@ -94,7 +93,7 @@
             {
 
                 $query    = self::getNominatimEndpoint() . "reverse?lat={$latitude}&lon={$longitude}&format=json&zoom=18";
-                $response = [];
+                $response = array();
 
                 $http_response = \Idno\Core\Webservice::get($query)['content'];
 

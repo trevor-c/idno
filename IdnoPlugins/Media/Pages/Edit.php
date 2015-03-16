@@ -21,9 +21,9 @@
                 ))->draw('entity/Media/edit');
 
                 if (empty($object)) {
-                    $title = 'Upload a picture';
+                    $title = 'Upload audio';
                 } else {
-                    $title = 'Edit picture details';
+                    $title = 'Edit audio details';
                 }
 
                 if (!empty($this->xhr)) {
@@ -46,7 +46,7 @@
 
                 if ($object->saveDataFromInput($this)) {
                     //$this->forward(\Idno\Core\site()->config()->getURL() . 'content/all/#feed');
-                    $this->forward($object->getURL());
+                    $this->forward($object->getDisplayURL());
                 }
 
             }

@@ -44,6 +44,11 @@
                 // TODO deleting files would be good ...
             }
 
+            function remove()
+            {
+                return $this->delete();
+            }
+
             /**
              * Passes through the contents of this file.
              */
@@ -59,9 +64,10 @@
              * @param string $filename Filename to store
              * @param string $mime_type MIME type associated with the file
              * @param bool $return_object Return the file object? If set to false (as is default), will return the ID
+             * @param bool $destroy_exif When true, if an image is uploaded the exif data will be destroyed.
              * @return bool|\id Depending on success
              */
-            public static function createFromFile($file_path, $filename, $mime_type = 'application/octet-stream', $return_object = false)
+            public static function createFromFile($file_path, $filename, $mime_type = 'application/octet-stream', $return_object = false, $destroy_exif = false)
             {
                 if (file_exists($file_path) && !empty($filename)) {
                     if ($fs = \Idno\Core\site()->filesystem()) {
@@ -70,6 +76,29 @@
                             'filename'  => $filename,
                             'mime_type' => $mime_type
                         );
+
+                        // Get image filesize
+                        if (self::isImage($file_path)) {
+                            $photo_information = getimagesize($file_path);
+                            if (!empty($photo_information[0]) && !empty($photo_information[1])) {
+                                $metadata['width'] = $photo_information[0];
+                                $metadata['height'] = $photo_information[1];
+                            }
+                        }
+
+                        // Do we want to remove EXIF data?
+                        if (!empty($photo_information) && $destroy_exif)
+                        {
+                            $tmpfname = $file_path;
+                            switch ($photo_information['mime']) {
+                                case 'image/jpeg':
+                                    $image = imagecreatefromjpeg($file_path);
+                                    imagejpeg($image, $tmpfname);
+                                    break;
+                            }
+                            
+                        }
+                        
                         if ($id = $fs->storeFile($file_path, $metadata, $metadata)) {
                             if (!$return_object) {
                                 return $id;
@@ -103,9 +132,10 @@
              * @param string $filename Filename that the file should have on download.
              * @param int $max_dimension The maximum number of pixels the thumbnail image should be along its longest side.
              * @param bool $square If this is set to true, the thumbnail will be made square.
+             * @param mixed $exif Optionally provide exif data for the image, if not provided then this function will attempt to extract it
              * @return bool|id
              */
-            public static function createThumbnailFromFile($file_path, $filename, $max_dimension = 800, $square = false)
+            public static function createThumbnailFromFile($file_path, $filename, $max_dimension = 800, $square = false, $exif = null)
             {
 
                 $thumbnail = false;
@@ -149,7 +179,7 @@
                                     $original_height = $photo_information[0];
                                     $original_width = $photo_information[0];
                                     $offset_x = 0;
-                                    $offset_y = round(($photo_information[0] - $photo_information[1]) / 2);
+                                    $offset_y = round(($photo_information[1] - $photo_information[0]) / 2);
                                 }
                             } else {
                                 $new_height = $height;
@@ -164,9 +194,11 @@
                             imagesavealpha($image_copy, true);
                             imagecopyresampled($image_copy, $image, 0, 0, $offset_x, $offset_y, $new_width, $new_height, $original_width, $original_height);
 
+
                             if (is_callable('exif_read_data') && $photo_information['mime'] == 'image/jpeg') {
                                 try {
-                                    $exif = exif_read_data($file_path);
+                                    if (!$exif)
+                                        $exif = exif_read_data($file_path);
                                     if (!empty($exif['Orientation'])) {
                                         switch ($exif['Orientation']) {
                                             case 8:
@@ -184,11 +216,12 @@
                                     // Don't do anything
                                 }
                             }
+                            
 
                             $tmp_dir = dirname($file_path);
                             switch ($photo_information['mime']) {
                                 case 'image/jpeg':
-                                    imagejpeg($image_copy, $tmp_dir . '/' . $filename . '.jpg');
+                                    imagejpeg($image_copy, $tmp_dir . '/' . $filename . '.jpg', 85);
                                     $thumbnail = \Idno\Entities\File::createFromFile($tmp_dir . '/' . $filename . '.jpg', "thumb_{$max_dimension}.jpg", 'image/jpeg') . '/thumb.jpg';
                                     @unlink($tmp_dir . '/' . $filename . '.jpg');
                                     break;
@@ -248,6 +281,21 @@
             }
 
             /**
+             * Attempt to extract a file from a URL to it. Will fail with false if the file is external or otherwise
+             * can't be retrieved.
+             * @param $url
+             * @return \Idno\Common\Entity|\MongoGridFSFile|null
+             */
+            static function getByURL($url)
+            {
+                if (substr_count($url, \Idno\Core\site()->config()->getDisplayURL() . 'file/')) {
+                    $url = str_replace(\Idno\Core\site()->config()->getDisplayURL() . 'file/','',$url);
+                    return self::getByID($url);
+                }
+                return false;
+            }
+
+            /**
              * Retrieve file data by ID
              * @param string $id
              * @return mixed
@@ -273,26 +321,30 @@
             static function getFileDataFromAttachment($attachment) {
                 \Idno\Core\site()->logging->log(json_encode($attachment), LOGLEVEL_DEBUG);
                 if (!empty($attachment['_id'])) {
-                    \Idno\Core\site()->logging->log("Checking attachment ID", LOGLEVEL_DEBUG);
+                    //\Idno\Core\site()->logging->log("Checking attachment ID", LOGLEVEL_DEBUG);
                     if ($bytes = self::getFileDataByID((string)$attachment['_id'])) {
-                        \Idno\Core\site()->logging->log("Retrieved some bytes", LOGLEVEL_DEBUG);
+                        //\Idno\Core\site()->logging->log("Retrieved some bytes", LOGLEVEL_DEBUG);
                         if (strlen($bytes)) {
-                            \Idno\Core\site()->logging->log("Bytes! " . $bytes, LOGLEVEL_DEBUG);
+                            //\Idno\Core\site()->logging->log("Bytes! " . $bytes, LOGLEVEL_DEBUG);
                             return $bytes;
                         } else {
-                            \Idno\Core\site()->logging->log("Sadly no bytes", LOGLEVEL_DEBUG);
+                            //\Idno\Core\site()->logging->log("Sadly no bytes", LOGLEVEL_DEBUG);
                         }
                     } else {
-                        \Idno\Core\site()->logging->log("No bytes retrieved", LOGLEVEL_DEBUG);
+                        //\Idno\Core\site()->logging->log("No bytes retrieved", LOGLEVEL_DEBUG);
                     }
                 } else {
                     \Idno\Core\site()->logging->log("Empty attachment _id", LOGLEVEL_DEBUG);
                 }
                 if (!empty($attachment['url'])) {
-                    if ($bytes = file_get_contents($attachment['url'])) {
-                        \Idno\Core\site()->logging->log("Returning bytes", LOGLEVEL_DEBUG);
-                        return $bytes;
-                    } else {
+                    try {
+                        if ($bytes = @file_get_contents($attachment['url'])) {
+                            \Idno\Core\site()->logging->log("Returning bytes", LOGLEVEL_DEBUG);
+                            return $bytes;
+                        } else {
+                            \Idno\Core\site()->logging->log("Couldn't get bytes from " . $attachment['url'], LOGLEVEL_DEBUG);
+                        }
+                    } catch (\Exception $e) {
                         \Idno\Core\site()->logging->log("Couldn't get bytes from " . $attachment['url'], LOGLEVEL_DEBUG);
                     }
                 } else {

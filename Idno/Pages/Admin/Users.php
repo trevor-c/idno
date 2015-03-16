@@ -17,13 +17,13 @@
             {
                 $this->adminGatekeeper(); // Admins only
 
-                $users = User::get([], [], 99999, 0); // TODO: make this more complete / efficient
-                $remoteusers = RemoteUser::get([], [], 99999, 0);
+                $users = User::get(array(), array(), 99999, 0); // TODO: make this more complete / efficient
+                $remoteusers = RemoteUser::get(array(), array(), 99999, 0);
                 
                 $users = array_merge($users, $remoteusers);
 
                 $t        = \Idno\Core\site()->template();
-                $t->body  = $t->__(['users' => $users])->draw('admin/users');
+                $t->body  = $t->__(array('users' => $users))->draw('admin/users');
                 $t->title = 'User Management';
                 $t->drawPage();
 
@@ -53,6 +53,14 @@
                             \Idno\Core\site()->session()->addMessage($user->getTitle() . " was stripped of their administration rights.");
                         }
                         break;
+                    case 'delete':
+                        $uuid = $this->getInput('user');
+                        if ($user = User::getByUUID($uuid)) {
+                            if ($user->delete()) {
+                                \Idno\Core\site()->session()->addMessage($user->getTitle() . " was removed from your site.");
+                            }
+                        }
+                        break;
                     case 'invite_users':
                         $emails = $this->getInput('invitation_emails');
 
@@ -65,8 +73,9 @@
                                 foreach ($matches[0] as $email) {
                                     if (filter_var($email, FILTER_VALIDATE_EMAIL)) {
                                         if (!($user = User::getByEmail($email))) {
-                                            (new Invitation())->sendToEmail($email);
-                                            $invitation_count++;
+                                            if ((new Invitation())->sendToEmail($email) !== 0) {
+                                                $invitation_count++;
+                                            }
                                         }
                                     }
                                 }

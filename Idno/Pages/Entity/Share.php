@@ -24,9 +24,9 @@
                 $event = new \Idno\Core\Event();
                 $event->setResponse($url);
                 \Idno\Core\site()->events()->dispatch('url/shorten', $event);
-                $url = $event->response();
+                $short_url = $event->response();
 
-                if (!in_array($type, ['note','reply','rsvp','like'])) {
+                if (!in_array($type, array('note','reply','rsvp','like','bookmark'))) {
                     $share_type = 'note';
 
                     if ($content = \Idno\Core\Webservice::get($url)) {
@@ -52,14 +52,16 @@
                 $content_type = \Idno\Common\ContentType::getRegisteredForIndieWebPostType($share_type);
                 
                 $hide_nav = false;
-                if ($this->getInput('via') == 'ff_social')
+                if ($this->getInput('via') == 'ff_social') {
                     $hide_nav = true;
+                }
 
                 if (!empty($content_type)) {
                     if ($page = \Idno\Core\site()->getPageHandler('/' . $content_type->camelCase($content_type->getEntityClassName()) . '/edit')) {
                         if ($share_type == 'note' /*&& !substr_count($url, 'twitter.com')*/) {
-                            $page->setInput('body', $title . ' ' . $url);
+                            $page->setInput('body', $title . ' ' . $short_url);
                         } else {
+                            $page->setInput('short-url', $short_url);
                             $page->setInput('url', $url);
                             if (substr_count($url, 'twitter.com')) {
                                 preg_match("|https?://(www\.)?twitter\.com/(#!/)?@?([^/]*)|", $url, $matches);
@@ -75,8 +77,8 @@
                     }
                 } else {
                     $t    = \Idno\Core\site()->template();
-                    $body = $t->__(['share_type' => $share_type, 'content_type' => $content_type, 'sharing' => true])->draw('entity/share');
-                    $t->__(['title' => 'Share', 'body' => $body, 'hidenav' => $hide_nav])->drawPage();
+                    $body = $t->__(array('share_type' => $share_type, 'content_type' => $content_type, 'sharing' => true))->draw('entity/share');
+                    $t->__(array('title' => 'Share', 'body' => $body, 'hidenav' => $hide_nav))->drawPage();
                 }
             }
 

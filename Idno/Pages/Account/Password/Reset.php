@@ -23,7 +23,7 @@
                     if ($code = $user->getPasswordRecoveryCode()) {
 
                         $t        = \Idno\Core\site()->template();
-                        $t->body  = $t->__(['email' => $email, 'code' => $code])->draw('account/password/reset');
+                        $t->body  = $t->__(array('email' => $email, 'code' => $code))->draw('account/password/reset');
                         $t->title = 'Reset password';
 
                         $t->drawPage();
@@ -32,7 +32,7 @@
                     }
                 }
 
-                \Idno\Core\site()->session()->addMessage("The password reset code wasn't valid. They expire after three hours, so you might need to try again.");
+                \Idno\Core\site()->session()->addErrorMessage("The password reset code wasn't valid. They expire after three hours, so you might need to try again.");
                 $this->forward(\Idno\Core\site()->config()->getURL() . 'account/password');
 
             }
@@ -46,7 +46,7 @@
                 $password  = trim($this->getInput('password'));
                 $password2 = trim($this->getInput('password2'));
 
-                if ($password == $password2 && !empty($password2)) {
+                if (\Idno\Entities\User::checkNewPasswordStrength($password) && $password == $password2) {
                     if ($user = \Idno\Entities\User::getByEmail($email)) {
 
                         if ($code = $user->getPasswordRecoveryCode()) {
@@ -60,7 +60,7 @@
 
                     }
                 } else {
-                    \Idno\Core\site()->session()->addMessage("Your passwords need to match!");
+                    \Idno\Core\site()->session()->addErrorMessage('Sorry, your passwords either don\'t match, or are too weak', 'alert-error');
                     $this->forward($_SERVER['HTTP_REFERER']);
                 }
 

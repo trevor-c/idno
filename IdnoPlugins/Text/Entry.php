@@ -2,6 +2,8 @@
 
     namespace IdnoPlugins\Text {
 
+        use Idno\Core\Autosave;
+
         class Entry extends \Idno\Common\Entity {
 
             function getTitle() {
@@ -41,6 +43,19 @@
                 return 'article';
             }
 
+            /**
+             * Retrieve icon
+             * @return mixed|string
+             */
+            function getIcon() {
+                $xpath = new \DOMXPath(@\DOMDocument::loadHTML($this->getDescription()));
+                $src = $xpath->evaluate("string(//img/@src)");
+                if (!empty($src)) {
+                    return $src;
+                }
+                return parent::getIcon();
+            }
+
             function saveDataFromInput() {
 
                 if (empty($this->_id)) {
@@ -62,16 +77,16 @@
                         }
                     }
 
-                    if ($this->save()) {
-                        if ($new) {
-                            // Add it to the Activity Streams feed
-                            $this->addToFeed();
-                        }
+                    if ($this->save($new)) {
+
+                        $autosave = new Autosave();
+                        $autosave->clearContext('entry');
+
                         \Idno\Core\Webmention::pingMentions($this->getURL(), \Idno\Core\site()->template()->parseURLs($this->getTitle() . ' ' . $this->getDescription()));
                         return true;
                     }
                 } else {
-                    \Idno\Core\site()->session()->addMessage('You can\'t save an empty entry.');
+                    \Idno\Core\site()->session()->addErrorMessage('You can\'t save an empty entry.');
                 }
                 return false;
 

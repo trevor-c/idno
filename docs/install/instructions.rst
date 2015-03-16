@@ -4,9 +4,8 @@ Installation instructions
 Before you begin
 ----------------
 
-By installing Known now, you're working on the cutting edge. When we release this summer, there will be a friendly
-installer, as well as a full hosted service for you to check out the features. Right now, there's a little bit more
-involved.
+If you're running Known in production, we highly recommend that you download the installation package from
+`withknown.com <https://withknown.com/>`_.
 
 To begin with, make sure your server satisfies the :doc:`requirements`.
 
@@ -17,32 +16,58 @@ that will just work, out of the box.
 Upload Known files
 ------------------
 
-Right now, there isn't a stable installation package for Known, so every installation lives on the cutting edge. For
-now, we assume you're okay with that. A friendly installer with everything you need to get going will be released
-this summer.
+Known releases stable installation packages from `withknown.com <https://withknown.com/>`_ in both .zip and .tar.gz
+formats. If you are using Known for any purpose other than development, this is the recommended source for Known
+installations.
 
-You can place the code on your host by:
+Note that Known currently does not support installation in subdirectories. Your Known site must be at the root of your
+domain or subdomain.
 
-* Git clone the repository to an appropriate directory (or just straight into the folder root of your web host).
-  Note that you need to make sure you acquire `the Git submodules <http://git-scm.com/book/en/Git-Tools-Submodules>`_.
-  eg: ```git clone --recursive git@github.com:idno/idno.git /path/to/webroot```
+You can place the platform on your web host by:
+
+* Downloading the latest package from `the Known homepage <https://withknown.com/>`_. This is by far the easiest
+  option. If you've uploaded the files inside the archive to your web host, you can skip to the configuration section
+  of these documents, below.
+* Git clone the repository to an appropriate directory (or just straight into the folder root of your web host). You
+  can also grab the master zip file from `the Known git repository <https://github.com/idno/idno>`_.
 * If you git cloned the repository to your local disk, use a file transfer app to move the files to your web host.
 
 Explaining how to use Git is beyond the scope of this tutorial, but there are plenty of great tutorials on the web. 
-Make sure to enable the `Git submodules <http://git-scm.com/book/en/Git-Tools-Submodules>`.
+Make sure to enable the `Git submodules <http://git-scm.com/book/en/Git-Tools-Submodules>`_.
 You'll find the Known git repository URL on `the main Known GitHub page <https://github.com/idno/idno>`_.
 
 Configure Known
 ---------------
 
+Use the automatic installer
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+If you're using a MySQL back-end, you can get started by pointing your browser at your Known site address. If you want
+to use MongoDB, you'll need to create the configuration file manually, as described below.
+
+Use environment variables
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+If you're using Docker or other virtualized server environments, you will need to create a config.ini file at the root
+of your installation. However, all configuration items can be stored in environment variables starting with KNOWN_.
+For example, the following environment variables will allow you to set the database::
+
+    KNOWN_DATABASE = "MySQL"
+    KNOWN_DBNAME = "KnownDBName"
+    KNOWN_DBUSER = "KnownDBUser"
+    KNOWN_DBPASS = "KnownDBPassword"
+    KNOWN_DBHOST = "your.database.server"
+
 If you're using MongoDB
 ^^^^^^^^^^^^^^^^^^^^^^^
 
 If your MongoDB installation accepts connections from localhost, and you're happy for your Known MongoDB database to be
-called Known, you don't need to do anything else in this section.
+called Known, you can simply create a file called :doc:`config.ini` in the root of your installation containing::
+
+    database = "MongoDB"
 
 If you'd like to use an alternative `MongoDB connection string <http://docs.mongodb.org/manual/reference/connection-string/>`_,
-save a file called *config.ini* in the root of your Known installation. Lay it out like this::
+you can add that to :doc:`config.ini` like this::
 
     [Database configuration]
     dbstring = "Your MongoDB connection string"
@@ -91,6 +116,12 @@ Then, add the following to your config.ini file::
         uploadpath = "/Users/ben/Sites/withknown.com/data/"
 
 Of course, replace the path with the path to your data folder.
+
+Copy .htaccess
+^^^^^^^^^^^^^^
+
+If you are using Known 0.6.5 and Apache 2.4, copy htaccess-2.4.dist to .htaccess; otherwise, copy htaccess.dist to .htaccess.
+If you downloaded from git, you may skip this step.
 
 Load Known
 ----------

@@ -5,15 +5,15 @@
 
             <div class="span8 offset2 edit-pane">
                 <h4>
-                                    <?php
+                    <?php
 
-                    if (empty($vars['object']->_id)) {
-                        ?>New Bookmark<?php
-                    } else {
-                        ?>Edit Bookmark<?php
-                    }
+                        if (empty($vars['object']->_id)) {
+                            ?>New Bookmark<?php
+                        } else {
+                            ?>Edit Bookmark<?php
+                        }
 
-                ?>
+                    ?>
                 </h4>
 
                 <p>
@@ -26,19 +26,22 @@
                                    echo htmlspecialchars($vars['url']);
                                } ?>" class="span8"/>
                     </label>
+                    <!-- <label>
+                        Page title<br/>
+                        <input required type="text" name="title" id="title" placeholder="Page name"
+                               value="<?php
+                                   echo htmlspecialchars($vars['object']->title);
+                               ?>" class="span8"/>
+                    </label> -->
                     <label>
                         Comments<br/>
 
                     </label>
 
                     <textarea name="description" id="description" class="span8"
-                              placeholder="This page is great because..."><?= htmlspecialchars($vars['object']->description); ?></textarea>
-                    <label>
-                        Tags<br/>
-                        <input type="text" name="tags" id="tags" placeholder="Add some #tags"
-                               value="<?= htmlspecialchars($vars['object']->tags) ?>" class="span8"/>
-                    </label>
+                              placeholder="This page is great because... Use hashtags to organize your bookmark."><?= htmlspecialchars($vars['object']->description); ?></textarea>
                 </p>
+                <?=$this->draw('entity/tags/input');?>
                 <?php if (empty($vars['object']->_id)) echo $this->drawSyndication('bookmark'); ?>
                 <p class="button-bar">
                     <?= \Idno\Core\site()->actions()->signForm('/like/edit') ?>

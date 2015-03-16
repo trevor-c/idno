@@ -14,7 +14,7 @@
                     require_once site()->config()->path . '/external/swiftmailer/lib/swift_required.php';
                     $this->message = \Swift_Message::newInstance();
                 } catch (\Exception $e) {
-                    site()->session()->addMessage("Something went wrong and we couldn't create the email message to send.");
+                    site()->session()->addErrorMessage("Something went wrong and we couldn't create the email message to send.");
                 }
             }
 
@@ -36,7 +36,7 @@
             function setFrom($email, $name = '')
             {
                 if (!empty($name)) {
-                    return $this->message->addFrom([$name => $email]);
+                    return $this->message->addFrom(array($name => $email));
                 }
 
                 return $this->message->addFrom($email);
@@ -51,7 +51,7 @@
             function addTo($email, $name = '')
             {
                 if (!empty($name)) {
-                    return $this->message->addTo([$name => $email]);
+                    return $this->message->addTo(array($name => $email));
                 }
 
                 return $this->message->addTo($email);
@@ -76,7 +76,7 @@
             function setReplyTo($email, $name = '')
             {
                 if (!empty($name)) {
-                    return $this->message->addReplyTo([$name => $email]);
+                    return $this->message->addReplyTo(array($name => $email));
                 }
 
                 return $this->message->addReplyTo($email);
@@ -93,7 +93,7 @@
                 if ($shell) {
                     $t = clone site()->template();
                     $t->setTemplateType('email');
-                    $message = $t->__(['body' => $body])->draw('shell');
+                    $message = $t->__(array('body' => $body))->draw('shell');
                 } else {
                     $message = $body;
                 }
@@ -107,7 +107,7 @@
              * @param array $vars
              * @return mixed
              */
-            function setHTMLBodyFromTemplate($template_name, $vars = [])
+            function setHTMLBodyFromTemplate($template_name, $vars = array())
             {
                 $t = clone site()->template();
                 $t->setTemplateType('email');
@@ -147,8 +147,11 @@
                     if (!empty(site()->config()->smtp_port)) {
                         $transport->setPort(site()->config()->smtp_port);
                     }
-                    if (!empty(site()->config()->smtp_tls)) {
-                        $transport->setEncryption('tls');
+                    if (!empty(site()->config()->smtp_secure)) {
+                        switch (site()->config()->smtp_secure) {   
+                            case 'tls': $transport->setEncryption('tls'); break;
+                            case 'ssl': $transport->setEncryption('ssl'); break;
+                        }
                     }
                     $mailer = \Swift_Mailer::newInstance($transport);
 
@@ -159,9 +162,14 @@
 
                     return $mailer->send($this->message);
                 } catch (\Exception $e) {
+                    // Lets log errors rather than silently drop them
+                    \Idno\Core\site()->logging()->log($e->getMessage(), LOGLEVEL_ERROR);
+                    
                     //site()->session()->addMessage("Something went wrong and we couldn't send the email.");
                     //site()->session()->addMessage($e->getMessage());
                 }
+                
+                return 0;
             }
 
         }

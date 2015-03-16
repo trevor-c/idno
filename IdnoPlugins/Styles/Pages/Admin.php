@@ -25,7 +25,7 @@
 
                 $t = \Idno\Core\site()->template();
                 $t->__(array(
-                            'body'  => $t->__(['css' => $css])->draw('styles/admin'),
+                            'body'  => $t->__(array('css' => $css))->draw('styles/admin'),
                             'title' => 'Site Styles'
                        ))->drawPage();
             }
@@ -40,7 +40,7 @@
                 }
                 $css = trim(strip_tags($css));
 
-                $styles                             = ['css' => $css];
+                $styles                             = array('css' => $css);
                 $config = \Idno\Core\site()->config;
                 $config->styles = $styles;
                 \Idno\Core\site()->config = $config;

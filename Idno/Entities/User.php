@@ -9,7 +9,7 @@
 
     namespace Idno\Entities {
 
-        use Idno\Common\ContentType;
+        use Idno\Common\Entity;
         use Idno\Core\Email;
 
         // We need the PHP 5.5 password API
@@ -34,12 +34,14 @@
             /**
              * Register user-related events
              */
-            static function registerEvents() {
+            static function registerEvents()
+            {
 
                 // Hook to add user data to webfinger
                 \Idno\Core\site()->addEventHook('webfinger', function (\Idno\Core\Event $event) {
 
-                    $user = $event->data()['object'];
+                    $eventdata = $event->data();
+                    $user = $eventdata['object'];
 
                     $links = $event->response();
                     if (empty($links)) $links = array();
@@ -64,7 +66,8 @@
                 // Refresh session user whenever it is saved
                 \Idno\Core\site()->addEventHook('saved', function (\Idno\Core\Event $event) {
 
-                    $user = $event->data()['object'];
+                    $eventdata = $event->data();
+                    $user = $eventdata['object'];
 
                     if ($user instanceof User) {
                         if ($currentUser = \Idno\Core\site()->session()->currentUser()) {
@@ -79,22 +82,26 @@
                 // Email notifications
                 \Idno\Core\site()->addEventHook('notify', function (\Idno\Core\Event $event) {
 
-                    $user = $event->data()['user'];
+                    $eventdata = $event->data();
+                    $user = $eventdata['user'];
 
-                    if ($user instanceof User && $context = $event->data()['context']) {
+                    $eventdata = $event->data();
+                    if ($user instanceof User && $context = $eventdata['context']) {
 
-                        if (empty($user->notifications['email']) || $user->notifications['email'] == 'all' || ($user->notifications['email'] == 'comment' && in_array($context, ['comment', 'reply']))) {
+                        if (empty($user->notifications['email']) || $user->notifications['email'] == 'all' || ($user->notifications['email'] == 'comment' && in_array($context, array('comment', 'reply')))) {
 
-                            $vars = $event->data()['vars'];
+                            $eventdata = $event->data();
+                            $vars = $eventdata['vars'];
                             if (empty($vars)) {
-                                $vars = [];
+                                $vars = array();
                             }
-                            $vars['object'] = $event->data()['object'];
+                            $eventdata = $event->data();
+                            $vars['object'] = $eventdata['object'];
 
                             if (filter_var($user->email, FILTER_VALIDATE_EMAIL)) {
                                 $email = new Email();
-                                $email->setSubject($event->data()['message']);
-                                $email->setHTMLBodyFromTemplate($event->data()['message_template'], $vars);
+                                $email->setSubject($eventdata['message']);
+                                $email->setHTMLBodyFromTemplate($eventdata['message_template'], $vars);
                                 $email->addTo($user->email);
                                 $email->send();
                             }
@@ -123,10 +130,10 @@
                     return $this->image;
                 }
                 if (!empty($this->icon)) {
-                    return \Idno\Core\site()->config()->url . 'file/' . $this->icon;
+                    return \Idno\Core\site()->config()->getDisplayURL() . 'file/' . $this->icon;
                 }
 
-                return \Idno\Core\site()->template()->__(['user' => $this])->draw('entity/User/icon');
+                return \Idno\Core\site()->template()->__(array('user' => $this))->draw('entity/User/icon');
             }
 
             /**
@@ -156,7 +163,17 @@
                 if (!empty($this->url)) {
                     return $this->url;
                 }
-                return \Idno\Core\site()->config()->url . 'profile/' . $this->getHandle();
+
+                return \Idno\Core\site()->config()->getDisplayURL() . 'profile/' . $this->getHandle();
+            }
+
+            /**
+             * Wrapper for getURL for consistency
+             * @return string
+             */
+            function getDisplayURL()
+            {
+                return $this->getURL();
             }
 
             /**
@@ -218,7 +235,7 @@
             {
                 $handle = trim($handle);
                 $handle = strtolower($handle);
-                if (!empty($handle)) {
+                if (!empty($handle) && ctype_alnum($handle)) {
                     if (!self::getByHandle($handle)) {
                         $this->handle = $handle;
                     }
@@ -355,6 +372,27 @@
             }
 
             /**
+             * Check that a new password is strong.
+             * @param string $password
+             * @return bool
+             */
+            static function checkNewPasswordStrength($password)
+            {
+
+                $default = false;
+
+                // Default "base" password validation
+                if (strlen($password) >= 7) {
+                    $default = true;
+                }
+
+                return \Idno\Core\site()->triggerEvent('user/password/checkstrength', array(
+                    'password'  => $password
+                ), $default);
+
+            }
+
+            /**
              * Retrieve the current password recovery code - if it's less than three hours old
              * @return string|false
              */
@@ -419,14 +457,14 @@
                 if ($user instanceof \Idno\Entities\User) {
                     $users = $this->getFollowingUUIDs();
                     if (!in_array($user->getUUID(), $users, true)) {
-                        $users[$user->getUUID()] = ['name' => $user->getTitle(), 'icon' => $user->getIcon(), 'url' => $user->getURL()];
+                        $users[$user->getUUID()] = array('name' => $user->getTitle(), 'icon' => $user->getIcon(), 'url' => $user->getURL());
                         $this->following         = $users;
 
                         // Create/modify ACL for following user
-                        $acl = \Idno\Entities\AccessGroup::getOne([
+                        $acl = \Idno\Entities\AccessGroup::getOne(array(
                             'owner'             => $this->getUUID(),
                             'access_group_type' => 'FOLLOWING'
-                        ]);
+                        ));
 
                         if (empty($acl)) {
                             $acl                    = new \Idno\Entities\AccessGroup();
@@ -437,7 +475,7 @@
                         $acl->addMember($user->getUUID());
                         $acl->save();
 
-                        \Idno\Core\site()->triggerEvent('follow', ['user' => $this, 'following' => $user]);
+                        \Idno\Core\site()->triggerEvent('follow', array('user' => $this, 'following' => $user));
 
                         return true;
                     }
@@ -455,7 +493,7 @@
                 if (!empty($this->following)) {
                     return array_keys($this->following);
                 } else {
-                    return [];
+                    return array();
                 }
             }
 
@@ -469,7 +507,7 @@
                 if (!empty($this->following)) {
                     return $this->following;
                 } else {
-                    return [];
+                    return array();
                 }
             }
 
@@ -487,17 +525,17 @@
                     unset($users[$user->getUUID()]);
                     $this->following = $users;
 
-                    $acl = \Idno\Entities\AccessGroup::getOne([
+                    $acl = \Idno\Entities\AccessGroup::getOne(array(
                         'owner'             => $this->getUUID(),
                         'access_group_type' => 'FOLLOWING'
-                    ]);
+                    ));
 
                     if (!empty($acl)) {
                         $acl->removeMember($user->getUUID());
                         $acl->save();
                     }
 
-                    \Idno\Core\site()->triggerEvent('unfollow', ['user' => $this, 'following' => $user]);
+                    \Idno\Core\site()->triggerEvent('unfollow', array('user' => $this, 'following' => $user));
 
                     return true;
                 }
@@ -643,12 +681,16 @@
 
             /**
              * Get a user's settings for default content types on their homepage (or all the content types registered
-             * if none have been listed)
+             * if none have been listed).
+             *
+             * THIS IS A LEGACY FUNCTION AND DUE FOR REMOVAL.
+             * @deprecated
+             *
              * @return array
              */
             function getDefaultContentTypes()
             {
-                $friendly_types = [];
+                $friendly_types = array();
                 if ($temp_types = $this->settings['default_feed_content']) {
                     if (is_array($temp_types)) {
                         foreach ($temp_types as $temp_type) {
@@ -663,6 +705,19 @@
             }
 
             /**
+             * Return the total size of all files owned by this user
+             * @return int
+             */
+            function getFileUsage()
+            {
+                $bytes = 0;
+
+                // Gather bytes
+
+                return $bytes;
+            }
+
+            /**
              * Hook to provide a method of notifying a user - for example, sending an email or displaying a popup.
              *
              * @param string $message The short text message to notify the user with. (eg, a subject line.)
@@ -672,9 +727,9 @@
              * @param \Idno\Common\Entity|null $object Optionally, an object to pass
              * @param array|null $params Optionally, any parameters to pass to the process. NB: this should be used rarely.
              */
-            public function notify($message, $message_template = '', $vars = [], $context = '', $object = null, $params = null)
+            public function notify($message, $message_template = '', $vars = array(), $context = '', $object = null, $params = null)
             {
-                return \Idno\Core\site()->triggerEvent('notify', [
+                return \Idno\Core\site()->triggerEvent('notify', array(
                     'user'             => $this,
                     'message'          => $message,
                     'context'          => $context,
@@ -682,7 +737,7 @@
                     'message_template' => $message_template,
                     'object'           => $object,
                     'parameters'       => $params
-                ]);
+                ));
             }
 
             /**
@@ -695,7 +750,10 @@
 
                 if (!$this->canEdit()) return false;
 
-                $this->profile = \Idno\Core\site()->currentPage()->getInput('profile');
+                $profile = \Idno\Core\site()->currentPage()->getInput('profile');
+                if (!empty($profile)) {
+                    $this->profile = $profile;
+                }
                 if ($name = \Idno\Core\site()->currentPage()->getInput('name')) {
                     $this->setName($name);
                 }
@@ -715,10 +773,26 @@
 
             }
 
+            /**
+             * Remove this user and all its objects
+             * @return bool
+             */
+            function delete() {
+
+                // First, remove all owned objects
+                while ($objects = Entity::get(array('owner' => $this->getUUID(), array(), 100))) {
+                    foreach($objects as $object) {
+                        $object->delete();
+                    }
+                }
+
+                return parent::delete();
+            }
+
             public function jsonSerialize()
             {
                 $data          = parent::jsonSerialize();
-                $data['image'] = ['url' => $this->getIcon()];
+                $data['image'] = array('url' => $this->getIcon());
 
                 return $data;
             }

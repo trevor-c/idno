@@ -23,7 +23,7 @@
                     if (!empty(\Idno\Core\site()->config()->dbport)) {
                         $connection_string .= ';port=' . \Idno\Core\site()->config()->dbport;
                     }
-                    $this->client = new \PDO($connection_string, \Idno\Core\site()->config()->dbuser, \Idno\Core\site()->config()->dbpass);
+                    $this->client = new \PDO($connection_string, \Idno\Core\site()->config()->dbuser, \Idno\Core\site()->config()->dbpass, array(\PDO::MYSQL_ATTR_LOCAL_INFILE => 1));
                     $this->client->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
                     //$this->client->setAttribute(\PDO::ATTR_EMULATE_PREPARES, false);
                 } catch (\Exception $e) {
@@ -42,6 +42,7 @@
                 }
 
                 $this->database = \Idno\Core\site()->config()->dbname;
+                $this->checkAndUpgradeSchema();
 
             }
 
@@ -50,16 +51,18 @@
              */
             function handleSession()
             {
-                $sessionHandler = new \Symfony\Component\HttpFoundation\Session\Storage\Handler\PdoSessionHandler(\Idno\Core\site()->db()->getClient(),
-                    [
-                        'db_table'    => 'session',
-                        'db_id_col'   => 'session_id',
-                        'db_data_col' => 'session_value',
-                        'db_time_col' => 'session_time',
-                    ]
-                );
+                if (version_compare(phpversion(), '5.3', '>')) {
+                    $sessionHandler = new \Symfony\Component\HttpFoundation\Session\Storage\Handler\PdoSessionHandler(\Idno\Core\site()->db()->getClient(),
+                        array(
+                            'db_table'    => 'session',
+                            'db_id_col'   => 'session_id',
+                            'db_data_col' => 'session_value',
+                            'db_time_col' => 'session_time',
+                        )
+                    );
 
-                session_set_save_handler($sessionHandler, true);
+                    session_set_save_handler($sessionHandler, true);
+                }
             }
 
             /**
@@ -154,23 +157,34 @@
                 if (empty($array['entity_subtype'])) {
                     $array['entity_subtype'] = 'Idno\\Common\\Entity';
                 }
+                if (empty($array['created'])) {
+                    $array['created'] = date("Y-m-d H:i:s", time());
+                } else {
+                    $array['created'] = date("Y-m-d H:i:s", $array['created']);
+                }
+
+                $search = str_replace("\n", " \n ", $search);
+                $search = str_replace("\r", "", $search);
+                $search = str_replace("#", " #", $search);
+                $search = strtolower($search);
 
                 $client = $this->client;
                 /* @var \PDO $client */
 
                 try {
+
                     $statement = $client->prepare("insert into {$collection}
-                                                    (`uuid`, `_id`, `entity_subtype`,`owner`, `contents`, `search`)
+                                                    (`uuid`, `_id`, `entity_subtype`,`owner`, `contents`, `search`, `created`)
                                                     values
-                                                    (:uuid, :id, :subtype, :owner, :contents, :search)
-                                                    on duplicate key update `uuid` = :uuid, `entity_subtype` = :subtype, `owner` = :owner, `contents` = :contents, `search` = :search");
-                    if ($statement->execute([':uuid' => $array['uuid'], ':id' => $array['_id'], ':owner' => $array['owner'], ':subtype' => $array['entity_subtype'], ':contents' => $contents, ':search' => $search])) {
+                                                    (:uuid, :id, :subtype, :owner, :contents, :search, :created)
+                                                    on duplicate key update `uuid` = :uuid, `entity_subtype` = :subtype, `owner` = :owner, `contents` = :contents, `search` = :search, `created` = :created");
+                    if ($statement->execute(array(':uuid' => $array['uuid'], ':id' => $array['_id'], ':owner' => $array['owner'], ':subtype' => $array['entity_subtype'], ':contents' => $contents, ':search' => $search, ':created' => $array['created']))) {
                         if ($statement = $client->prepare("delete from metadata where _id = :id")) {
-                            $statement->execute([':id' => $array['_id']]);
+                            $statement->execute(array(':id' => $array['_id']));
                         }
                         foreach ($array as $key => $val) {
                             if (!is_array($val)) {
-                                $val = [$val];
+                                $val = array($val);
                             }
                             foreach($val as $value) {
                                 if (is_array($value) || is_object($value)) {
@@ -180,7 +194,7 @@
                                     $value = 0;
                                 }
                                 if ($statement = $client->prepare("insert into metadata set `collection` = :collection, `entity` = :uuid, `_id` = :id, `name` = :name, `value` = :value")) {
-                                    $statement->execute(['collection' => $collection, ':uuid' => $array['uuid'], ':id' => $array['_id'], ':name' => $key, ':value' => $value]);
+                                    $statement->execute(array('collection' => $collection, ':uuid' => $array['uuid'], ':id' => $array['_id'], ':name' => $key, ':value' => $value));
                                 }
                             }
                         }
@@ -188,7 +202,6 @@
                         return $array['_id'];
                     }
                 } catch (\Exception $e) {
-                    \Idno\Core\site()->session()->addMessage($e->getMessage());
                 }
 
                 return false;
@@ -227,11 +240,10 @@
             {
                 try {
                     $statement = $this->client->prepare("select distinct {$collection}.* from " . $collection . " where uuid = :uuid");
-                    if ($statement->execute([':uuid' => $uuid])) {
+                    if ($statement->execute(array(':uuid' => $uuid))) {
                         return $statement->fetch(\PDO::FETCH_ASSOC);
                     }
                 } catch (\Exception $e) {
-                    \Idno\Core\site()->session()->addMessage($e->getMessage());
                 }
 
                 return false;
@@ -271,7 +283,7 @@
             function getRecord($id, $collection = 'entities')
             {
                 $statement = $this->client->prepare("select {$collection}.* from " . $collection . " where _id = :id");
-                if ($statement->execute([':id' => $id])) {
+                if ($statement->execute(array(':id' => $id))) {
                     return $statement->fetch(\PDO::FETCH_ASSOC);
                 }
 
@@ -300,8 +312,6 @@
                 } catch (\Exception $e) {
                     if (\Idno\Core\site()->session() == null)
                         die($e->getMessage());
-
-                    \Idno\Core\site()->session()->addMessage($e->getMessage());
                 }
 
                 return false;
@@ -331,9 +341,9 @@
                 // and remove subtypes that have an exclamation mark before them
                 // from consideration
                 if (!empty($subtypes)) {
-                    $not = [];
+                    $not = array();
                     if (!is_array($subtypes)) {
-                        $subtypes = [$subtypes];
+                        $subtypes = array($subtypes);
                     }
                     foreach ($subtypes as $key => $subtype) {
                         if (substr($subtype, 0, 1) == '!') {
@@ -374,7 +384,7 @@
                     return $return;
                 }
 
-                return [];
+                return array();
 
             }
 
@@ -395,14 +405,14 @@
 
                     // Build query
                     $query            = "select distinct {$collection}.* from {$collection} ";
-                    $variables        = [];
+                    $variables        = array();
                     $metadata_joins   = 0;
-                    $non_md_variables = [];
+                    $non_md_variables = array();
                     $limit            = (int)$limit;
                     $offset           = (int)$offset;
-                    $where            = $this->build_where_from_array($parameters, $variables, $metadata_joins, $non_md_variables);
-                    for ($i = 0; $i <= $metadata_joins; $i++) {
-                        $query .= " left join metadata md{$i} on md{$i}.entity = entities.uuid ";
+                    $where            = $this->build_where_from_array($parameters, $variables, $metadata_joins, $non_md_variables, 'and', $collection);
+                    for ($i = 1; $i <= $metadata_joins; $i++) {
+                        $query .= " left join metadata md{$i} on md{$i}.entity = {$collection}.uuid ";
                     }
                     if (!empty($where)) {
                         $query .= ' where ' . $where . ' ';
@@ -413,16 +423,68 @@
                     /* @var \PDO $client */
 
                     $statement = $client->prepare($query);
+
                     if ($result = $statement->execute($variables)) {
                         return $statement->fetchAll(\PDO::FETCH_ASSOC);
                     }
 
                 } catch (\Exception $e) {
-                    \Idno\Core\site()->session()->addMessage($e->getMessage());
-
                     return false;
                 }
 
+                return false;
+            }
+
+            /**
+             * Export a collection as SQL.
+             * @param string $collection
+             * @return bool|string
+             */
+            function exportRecords($collection = 'entities')
+            {
+                try {
+                    $file = tempnam(\Idno\Core\site()->config()->getTempDir(),'sqldump');
+                    error_log('output file ' . $file);
+                    $client = $this->client; /* @var \PDO $client */
+                    $statement = $client->prepare("select * from {$collection}");
+                    $output = '';
+                    if ($response = $statement->execute()) {
+                        while ($object = $statement->fetch(\PDO::FETCH_ASSOC)) {
+                            $uuid = $object['uuid'];
+                            $fields = array_keys($object);
+                            $fields = array_map(function($v) { return '`' . $v . '`'; }, $fields);
+                            $object = array_map(function($v) { return \Idno\Core\site()->db()->getClient()->quote($v); }, $object);
+                            $line = 'insert into ' . $collection . ' ';
+                            $line .= '(' . implode(',',$fields) . ')';
+                            $line .= ' values ';
+                            $line .= '(' . implode(',', $object) . ');';
+                            $output .= $line . "\n";
+                            $metadata_statement = $client->prepare("select * from metadata where `entity` = :uuid");
+                            if ($metadata_response = $metadata_statement->execute([':uuid' => $uuid])) {
+                                while ($object = $metadata_statement->fetch(\PDO::FETCH_ASSOC)) {
+                                    $fields = array_keys($object);
+                                    $fields = array_map(function($v) { return '`' . $v . '`'; }, $fields);
+                                    $object = array_map(function($v) { return \Idno\Core\site()->db()->getClient()->quote($v); }, $object);
+                                    $line = 'insert into metadata ';
+                                    $line .= '(' . implode(',',$fields) . ')';
+                                    $line .= ' values ';
+                                    $line .= '(' . implode(',', $object) . ');';
+                                    $output .= $line . "\n";
+                                }
+                                unset($metadata_statement);
+                                gc_collect_cycles();    // Clean memory
+                            }
+                            $output .= "\n";
+                            unset($object);
+                            unset($fields);
+                            gc_collect_cycles();    // Clean memory
+                        }
+                    }
+                    return $output;
+                } catch (\Exception $e) {
+                    error_log("Uh oh. " . $e->getMessage());
+                    return false;
+                }
                 return false;
             }
 
@@ -441,7 +503,7 @@
 
                 $where = '';
                 if (empty($variables)) {
-                    $variables = [];
+                    $variables = array();
                 }
                 if (empty($metadata_joins)) {
                     $metadata_joins = 0;
@@ -450,25 +512,34 @@
                     $non_md_variables = 0;
                 }
                 if (is_array($params) && !empty($params)) {
-                    $subwhere = [];
+                    $subwhere = array();
                     foreach ($params as $key => $value) {
                         if (!is_array($value)) {
-                            if (in_array($key, ['uuid', '_id', 'entity_subtype', 'owner'])) {
+                            if (in_array($key, array('uuid', '_id', 'entity_subtype', 'owner', 'created'))) {
                                 $subwhere[]                                  = "(`{$collection}`.`{$key}` = :nonmdvalue{$non_md_variables})";
+                                if ($key == 'created') {
+                                    if (!is_int($value)) {
+                                        $value = strtotime($value);
+                                    }
+                                }
                                 $variables[":nonmdvalue{$non_md_variables}"] = $value;
                                 $non_md_variables++;
                             } else {
-                                $subwhere[]                           = "(md{$metadata_joins}.`name` = :name{$metadata_joins} and md{$metadata_joins}.`value` = :value{$metadata_joins})";
+                                $metadata_joins++;
+                                $subwhere[]                           = "(md{$metadata_joins}.`name` = :name{$metadata_joins} and md{$metadata_joins}.`value` = :value{$metadata_joins} and md{$metadata_joins}.`collection` = '{$collection}')";
                                 $variables[":name{$metadata_joins}"]  = $key;
                                 $variables[":value{$metadata_joins}"] = $value;
-                                $metadata_joins++;
                             }
                         } else {
                             if (!empty($value['$or'])) {
-                                $subwhere[] = "(" . $this->build_where_from_array($value['$or'], $variables, $metadata_joins, $non_md_variables, 'or') . ")";
+                                $subwhere[] = "(" . $this->build_where_from_array($value['$or'], $variables, $metadata_joins, $non_md_variables, 'or', $collection) . ")";
                             }
                             if (!empty($value['$not'])) {
-                                if (in_array($key, ['uuid', '_id', 'entity_subtype', 'owner'])) {
+                                if (!empty($value['$not']['$in'])) {
+                                    $value['$not'] = array_merge($value['$not'], $value['$not']['$in']);
+                                    unset($value['$not']['$in']);
+                                }
+                                if (in_array($key, array('uuid', '_id', 'entity_subtype', 'owner'))) {
                                     $notstring = "`{$collection}`.`$key` not in(";
                                     $i         = 0;
                                     foreach ($value['$not'] as $val) {
@@ -480,7 +551,8 @@
                                     }
                                     $notstring .= ")";
                                 } else {
-                                    $notstring                           = "(md{$metadata_joins}.`name` = :name{$metadata_joins} and md{$metadata_joins}.`value` not in (";
+                                    $metadata_joins++;
+                                    $notstring                           = "(md{$metadata_joins}.`name` = :name{$metadata_joins} and md{$metadata_joins}.`collection` = '{$collection}' and md{$metadata_joins}.`value` not in (";
                                     $variables[":name{$metadata_joins}"] = $key;
                                     $i                                   = 0;
                                     foreach ($value['$not'] as $val) {
@@ -490,13 +562,12 @@
                                         $non_md_variables++;
                                         $i++;
                                     }
-                                    $metadata_joins++;
                                     $notstring .= "))";
                                 }
                                 $subwhere[] = $notstring;
                             }
                             if (!empty($value['$in'])) {
-                                if (in_array($key, ['uuid', '_id', 'entity_subtype', 'owner'])) {
+                                if (in_array($key, array('uuid', '_id', 'entity_subtype', 'owner'))) {
                                     $instring = "`{$collection}`.`$key` in (";
                                     $i        = 0;
                                     foreach ($value['$in'] as $val) {
@@ -508,7 +579,8 @@
                                     }
                                     $instring .= ")";
                                 } else {
-                                    $instring                            = "(md{$metadata_joins}.`name` = :name{$metadata_joins} and md{$metadata_joins}.`value` in (";
+                                    $metadata_joins++;
+                                    $instring                            = "(md{$metadata_joins}.`name` = :name{$metadata_joins} and md{$metadata_joins}.`collection` = '{$collection}' and md{$metadata_joins}.`value` in (";
                                     $variables[":name{$metadata_joins}"] = $key;
                                     $i                                   = 0;
                                     foreach ($value['$in'] as $val) {
@@ -518,7 +590,6 @@
                                         $non_md_variables++;
                                         $i++;
                                     }
-                                    $metadata_joins++;
                                     $instring .= "))";
                                 }
                                 $subwhere[] = $instring;
@@ -546,7 +617,7 @@
              * @param array $search Any extra search terms in array format (eg array('foo' => 'bar')) (default: empty)
              * @param string $collection Collection to query; default: entities
              */
-            function countObjects($subtypes = '', $search = [], $collection = 'entities')
+            function countObjects($subtypes = '', $search = array(), $collection = 'entities')
             {
 
                 // Initialize query parameters to be an empty array
@@ -556,9 +627,9 @@
                 // and remove subtypes that have an exclamation mark before them
                 // from consideration
                 if (!empty($subtypes)) {
-                    $not = [];
+                    $not = array();
                     if (!is_array($subtypes)) {
-                        $subtypes = [$subtypes];
+                        $subtypes = array($subtypes);
                     }
                     foreach ($subtypes as $key => $subtype) {
                         if (substr($subtype, 0, 1) == '!') {
@@ -597,12 +668,12 @@
 
                     // Build query
                     $query            = "select count(distinct {$collection}.uuid) as total from {$collection} ";
-                    $variables        = [];
+                    $variables        = array();
                     $metadata_joins   = 0;
-                    $non_md_variables = [];
-                    $where            = $this->build_where_from_array($parameters, $variables, $metadata_joins, $non_md_variables);
+                    $non_md_variables = array();
+                    $where            = $this->build_where_from_array($parameters, $variables, $metadata_joins, $non_md_variables, 'and', $collection);
                     for ($i = 0; $i <= $metadata_joins; $i++) {
-                        $query .= " left join metadata md{$i} on md{$i}.entity = entities.uuid ";
+                        $query .= " left join metadata md{$i} on md{$i}.entity = {$collection}.uuid ";
                     }
                     if (!empty($where)) {
                         $query .= ' where ' . $where . ' ';
@@ -625,20 +696,31 @@
             }
 
             /**
+             * Get database errors
+             * @return mixed
+             */
+            function getErrors() {
+                if (!empty($this->client)) {
+                    return $this->client->errorInfo();
+                }
+                return false;
+            }
+
+            /**
              * Remove an entity from the database
              * @param string $id
              * @return true|false
              */
-            function deleteRecord($id)
+            function deleteRecord($id, $collection = 'entities')
             {
                 try {
 
                     $client = $this->client;
                     /* @var \PDO $client */
-                    $statement = $client->prepare("delete from entities where _id = :id");
-                    if ($statement->execute([':id' => $id])) {
+                    $statement = $client->prepare("delete from {$collection} where _id = :id");
+                    if ($statement->execute(array(':id' => $id))) {
                         if ($statement = $client->prepare("delete from metadata where _id = :id")) {
-                            return $statement->execute([':id' => $id]);
+                            return $statement->execute(array(':id' => $id));
                         }
                     }
 
@@ -669,7 +751,49 @@
              */
             function createSearchArray($query)
             {
-                return ['$search' => [$query]];
+                return array('$search' => array($query));
+            }
+
+            /**
+             * Retrieve version information from the schema
+             * @return array|bool
+             */
+            function getVersions()
+            {
+                try {
+                    $client = $this->client;    /* @var \PDO $client */
+                    $statement = $client->prepare("select * from `versions`");
+                    if ($statement->execute()) {
+                       return $statement->fetchAll(\PDO::FETCH_OBJ);
+                    }
+                } catch (\Exception $e) {
+                }
+                return false;
+            }
+
+            /**
+             * Checks the current schema version and upgrades if necessary
+             */
+            function checkAndUpgradeSchema() {
+                if ($versions = $this->getVersions()) {
+                    foreach($versions as $version) {
+                        if ($version->label == 'schema') {
+                            $basedate = $newdate = (int) $version->value;
+                            $upgrade_sql_files = array();
+                            $schema_dir = dirname(dirname(dirname(__FILE__))) . '/schemas/mysql/';
+                            $client = $this->client; /* @var \PDO $client */
+                            if ($basedate < 2014100801) {
+                                if ($sql = @file_get_contents($schema_dir . '2014100801.sql')) {
+                                    try {
+                                        $statement = $client->prepare($sql);
+                                        $statement->execute();
+                                    } catch (\Exception $e) {}
+                                }
+                                $newdate = 2014100801;
+                            }
+                        }
+                    }
+                }
             }
 
         }

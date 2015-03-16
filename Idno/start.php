@@ -21,7 +21,6 @@
             echo "<h1>Oh no! Known experienced a problem!</h1>";
             echo "<p>Known experienced a problem with this page and couldn't continue. The technical details are as follows:</p>";
             echo "<pre>$error_message</pre>";
-            echo "<p>We've logged this error and will make sure we take a look.</p>";
             echo "<p>If you like, you can <a href=\"mailto:hello@withknown.com?subject=" .
                 rawurlencode("Fatal error in Known install at {$_SERVER['SERVER_NAME']}{$_SERVER['REQUEST_URI']}") . "&body=" . rawurlencode($error_message) . "\">email us for more information</a>.";
 
@@ -31,8 +30,8 @@
         }
     });
 
-// Set time limit if we're using the default
-    if (ini_get('max_execution_time') == 30) {
+// Set time limit if we're using less
+    if (ini_get('max_execution_time') < 120 ) {
         set_time_limit(120);
     }
 
@@ -50,10 +49,13 @@
         $host = str_replace('www.', '', $host);
         define('KNOWN_MULTITENANT_HOST', $host);
 // idno plugins are located in /IdnoPlugins and must have their own namespace
-        $loader->registerNamespace('IdnoPlugins', [dirname(dirname(__FILE__)), dirname(dirname(__FILE__)) . '/hosts/' . $host]);
+        $loader->registerNamespace('IdnoPlugins', array(dirname(dirname(__FILE__)), dirname(dirname(__FILE__)) . '/hosts/' . $host));
 // idno themes are located in /Themes and must have their own namespace
-        $loader->registerNamespace('Themes', [dirname(dirname(__FILE__)), dirname(dirname(__FILE__)) . '/hosts/' . $host]);
+        $loader->registerNamespace('Themes', array(dirname(dirname(__FILE__)), dirname(dirname(__FILE__)) . '/hosts/' . $host));
     }
+
+// Shims
+    include 'shims.php';
 
 // Register our external namespaces (PSR-0 compliant modules that we love, trust and need)
 
@@ -71,14 +73,16 @@
     $loader->registerNamespace('webignition\NormalisedUrl', dirname(dirname(__FILE__)) . '/external/webignition/url/src');
     $loader->registerNamespace('Mf2', dirname(dirname(__FILE__)) . '/external/mf2');
 
+// Using Simplepie for RSS and Atom parsing
+    include dirname(dirname(__FILE__)) . '/external/simplepie/autoloader.php';
+
 // Register the autoloader
     $loader->register();
 
 // Register the idno-templates folder as the place to look for templates in Bonita
     \Bonita\Main::additionalPath(dirname(dirname(__FILE__)));
 
-// Not sure if this is the way we should be initializing everything yet.
-// TODO: do this more intelligently.
+// Init main system classes
 
     $idno         = new Idno\Core\Idno();
     $account      = new Idno\Core\Account();

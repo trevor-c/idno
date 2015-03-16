@@ -53,6 +53,13 @@
                 } else {
                     $new = false;
                 }
+
+                if ($new) {
+                    if (!\Idno\Core\site()->triggerEvent("file/upload",[],true)) {
+                        return false;
+                    }
+                }
+
                 $body = \Idno\Core\site()->currentPage()->getInput('body');
                 if (!empty($_FILES['comic']['tmp_name']) || !empty($this->_id)) {
                     $this->body        = $body;
@@ -77,17 +84,14 @@
                         }
                     }
                     $this->setAccess('PUBLIC');
-                    if ($this->save()) {
-                        if ($new) {
-                            // Add it to the Activity Streams feed
-                            $this->addToFeed();
-                        }
+                    if ($this->save($new)) {
+
                         \Idno\Core\Webmention::pingMentions($this->getURL(), \Idno\Core\site()->template()->parseURLs($this->getDescription()));
 
                         return true;
                     }
                 } else {
-                    \Idno\Core\site()->session()->addMessage('You can\'t save an empty comic.');
+                    \Idno\Core\site()->session()->addErrorMessage('You can\'t save an empty comic.');
                 }
 
                 return false;

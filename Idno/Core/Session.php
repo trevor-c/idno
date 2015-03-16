@@ -14,11 +14,12 @@
         class Session extends \Idno\Common\Component
         {
 
+            private $user;
+
             function init()
             {
-
-                ini_set('session.cookie_lifetime', 60 * 60 * 24 * 30); // Persistent cookies
-                ini_set('session.gc_maxlifetime', 60 * 60 * 24 * 30); // Garbage collection to match
+                ini_set('session.cookie_lifetime', 60 * 60 * 24 * 7); // Persistent cookies
+                ini_set('session.gc_maxlifetime', 60 * 60 * 24 * 7); // Garbage collection to match
                 ini_set('session.cookie_httponly', true); // Restrict cookies to HTTP only (help reduce XSS attack profile)
 
                 site()->db()->handleSession();
@@ -36,12 +37,13 @@
                 // Update the session on save, this is a shim until #46 is fixed properly with #49
                 \Idno\Core\site()->addEventHook('save', function (\Idno\Core\Event $event) {
 
-                    $object = $event->data()['object'];
+                    $eventdata = $event->data();
+                    $object = $eventdata['object'];
                     if ((!empty($object)) && ($object instanceof \Idno\Entities\User) // Object is a user
-                        && ((!empty($_SESSION['user'])) && ($object->getUUID() == $_SESSION['user']->getUUID()))
+                        && ((!empty($_SESSION['user_uuid'])) && ($object->getUUID() == $this->user->getUUID()))
                     ) // And we're not trying a user change (avoids a possible exploit)
                     {
-                        $_SESSION['user'] = $object;
+                        $this->user = $this->refreshSessionUser($object);
                     }
 
                 });
@@ -88,10 +90,22 @@
              */
             function isLoggedIn()
             {
-                if (!empty($_SESSION['user']) && $_SESSION['user'] instanceof \Idno\Entities\User) {
+                if (!empty($this->user) && $this->user instanceof \Idno\Entities\User) {
                     return true;
                 }
 
+                return false;
+            }
+
+            /**
+             * Returns true if a user is logged into the current session, and they're an admin.
+             * @return bool
+             */
+            function isAdmin()
+            {
+                if ($this->isLoggedIn()) {
+                    return $this->currentUser()->isAdmin();
+                }
                 return false;
             }
 
@@ -102,8 +116,9 @@
 
             function currentUser()
             {
-                if (!empty($_SESSION['user']))
-                    return $_SESSION['user'];
+                if (!empty($this->user)) {
+                    return $this->user;
+                }
 
                 return false;
             }
@@ -117,7 +132,7 @@
             function addMessage($message, $message_type = 'alert-info')
             {
                 if (empty($_SESSION['messages'])) {
-                    $_SESSION['messages'] = [];
+                    $_SESSION['messages'] = array();
                 }
                 $_SESSION['messages'][] = array('message' => $message, 'message_type' => $message_type);
             }
@@ -138,7 +153,7 @@
 
             function addMessageAtStart($message, $message_type = 'alert-info') {
                 if (empty($_SESSION['messages'])) {
-                    $_SESSION['messages'] = [];
+                    $_SESSION['messages'] = array();
                 }
                 array_unshift($_SESSION['messages'], array('message' => $message, 'message_type' => $message_type));
             }
@@ -164,7 +179,7 @@
                 if (!empty($_SESSION['messages'])) {
                     return $_SESSION['messages'];
                 } else {
-                    return [];
+                    return array();
                 }
             }
 
@@ -173,7 +188,7 @@
              */
             function flushMessages()
             {
-                $messages                       = [];
+                $messages                       = array();
                 $_SESSION['messages']           = $messages;
                 $_SESSION['last_message_flush'] = date('r', time());
             }
@@ -185,8 +200,9 @@
 
             function getWriteAccessGroups()
             {
-                if ($this->isLoggedOn())
+                if ($this->isLoggedOn()) {
                     return $this->currentUser()->getWriteAccessGroups();
+                }
 
                 return array();
             }
@@ -239,7 +255,8 @@
 
             function logUserOff()
             {
-                unset($_SESSION['user']);
+                unset($_SESSION['user_uuid']);
+                unset($this->user);
                 session_destroy();
 
                 return true;
@@ -289,20 +306,55 @@
             {
 
                 if (!empty($_SERVER['HTTP_X_KNOWN_USERNAME']) && !empty($_SERVER['HTTP_X_KNOWN_SIGNATURE'])) {
+
+                    \Idno\Core\site()->session()->setIsAPIRequest(true);
+                    if (!\Idno\Common\Page::isSSL() && !\Idno\Core\site()->config()->disable_cleartext_warning) {
+                        \Idno\Core\site()->session()->addErrorMessage("Warning: Access credentials were sent over a non-secured connection! To disable this warning set disable_cleartext_warning in your config.ini");
+                    }
+                    
+                    $t = site()->currentPage()->getInput('_t');
+                    if (empty($t)) {
+                        site()->template()->setTemplateType('json');
+                    }
+
                     if ($user = \Idno\Entities\User::getByHandle($_SERVER['HTTP_X_KNOWN_USERNAME'])) {
+
+                        // Short circuit authentication, since this user is already logged in. Needed to resolve #595
+                        if (\Idno\Core\site()->session()->currentUser() && \Idno\Core\site()->session()->currentUser()->getUUID() == $user->getUUID())
+                            return $user;
+
                         $key          = $user->getAPIkey();
                         $hmac         = trim($_SERVER['HTTP_X_KNOWN_SIGNATURE']);
                         $compare_hmac = base64_encode(hash_hmac('sha256', $_SERVER['REQUEST_URI'], $key, true));
+
                         if ($hmac == $compare_hmac) {
+
                             \Idno\Core\site()->session()->logUserOn($user);
-                            \Idno\Core\site()->session()->setIsAPIRequest(true);
 
                             return $user;
+
                         }
+
                     }
                 }
 
-                return false;
+                // We're not logged in yet, so try and authenticate using other mechanism
+                if ($return = site()->triggerEvent('user/auth/api', [], false)) {
+                    \Idno\Core\site()->session()->setIsAPIRequest(true);
+                    
+                    if (!\Idno\Common\Page::isSSL() && !\Idno\Core\site()->config()->disable_cleartext_warning) {
+                        \Idno\Core\site()->session()->addErrorMessage("Warning: Access credentials were sent over a non-secured connection! To disable this warning set disable_cleartext_warning in your config.ini");
+                    }
+                }
+
+                // If this is an API request but we're not logged in, set page response code to access denied
+                if ($this->isAPIRequest() && !$return) {
+                    error_log("Bad auth");
+                    site()->currentPage()->setResponse(403);
+                }
+
+                return $return;
+
             }
 
             /**
@@ -316,9 +368,7 @@
             {
                 $return = $this->refreshSessionUser($user);
 
-                \Idno\Core\site()->triggerEvent('user/auth', ['user' => $user]);
-
-                return $return;
+                return \Idno\Core\site()->triggerEvent('user/auth', array('user' => $user), $return);
             }
 
             /**
@@ -329,11 +379,29 @@
             function refreshSessionUser(\Idno\Entities\User $user)
             {
                 if ($user = User::getByUUID($user->getUUID())) {
-                    $_SESSION['user'] = $user;
+                    $_SESSION['user_uuid'] = $user->getUUID();
+                    $this->user = $user;
                     return $user;
                 }
 
                 return false;
+            }
+
+            /**
+             * If we're logged in, refresh the current session user.
+             */
+            function refreshCurrentSessionuser()
+            {
+                if (!$this->currentUser() && !empty($_SESSION['user_uuid'])) {
+                    $this->user = User::getByUUID($_SESSION['user_uuid']);
+                } else if ($this->isLoggedIn()) {
+                    $user_uuid = $this->currentUserUUID();
+                    if ($user = User::getByUUID($user_uuid)) {
+                        $this->refreshSessionUser($user);
+                    } else {
+                        $this->logUserOff();
+                    }
+                }
             }
 
             /**
@@ -369,7 +437,11 @@
                     if (!site()->session()->isLoggedOn()) {
                         $class = get_class(site()->currentPage());
                         if (!site()->isPageHandlerPublic($class)) {
-                            site()->currentPage()->forward(site()->config()->getURL() . 'session/login/');
+                            
+                            site()->currentPage()->setResponse(403);
+                            if (!\Idno\Core\site()->session()->isAPIRequest()) {
+                                site()->currentPage()->forward(site()->config()->getURL() . 'session/login/');
+                            }
                         }
                     }
                 }

@@ -28,15 +28,16 @@
             function registerPages()
             {
                 // These pages will be called by the hub after registration
-                site()->addPageHandler('hub/register/site/callback', 'Idno\Pages\Hub\Register\Site', true);
-                site()->addPageHandler('hub/register/user/callback', 'Idno\Pages\Hub\Register\User', true);
+                site()->addPageHandler('/hub/register/site/callback/?', 'Idno\Pages\Hub\Register\Site', true);
+                site()->addPageHandler('/hub/register/user/callback/?', 'Idno\Pages\Hub\Register\User', true);
             }
 
             function registerEventHooks()
             {
                 // Register user on login
                 site()->addEventHook('login/success', function (\Idno\Core\Event $event) {
-                    if ($user = $event->data()['user']) {
+                    $eventdata = $event->data();
+                    if ($user = $eventdata['user']) {
                         $this->registerUser($user);
                     }
                 });
@@ -48,6 +49,15 @@
              */
             function setServer($server)
             {
+                /*$urischeme = parse_url($server, PHP_URL_SCHEME);
+                if (site()->isSecure()) {
+                    $newuri = 'https:';
+                } else {
+                    $newuri = 'http:';
+                }
+
+                $server = str_replace($urischeme . ':', $newuri, $server);*/
+                //site()->logging()->log('Saved connection to hub ' . $server);
                 $this->server = $server;
             }
 
@@ -87,26 +97,21 @@
                 ) {
                     // Establish auth details, save them, and then connect
                     if ($details = $this->register()) {
-
                     }
-
                 }
 
-                // If we have details, and we're logged in, connect with OAuth
+                // If we have details, and we're logged in, connect
                 if (site()->session()->isLoggedOn()) {
-                    \Idno\Core\site()->logging->log("User is logged on, checking hub status");
                     if (!empty($details)) {
                         try {
-                            if (!$this->userIsRegistered()) {
-                                \Idno\Core\site()->logging->log("User isn't registered; registering ...");
-                                $this->registerUser();
+                            if (!$this->userIsRegistered(site()->session()->currentUser())) {
+                                \Idno\Core\site()->logging->log("User isn't registered on hub; registering ...");
+                                $this->registerUser(site()->session()->currentUser());
                             }
                         } catch (\Exception $e) {
                             \Idno\Core\site()->logging->log($e->getMessage());
                         }
                     }
-                } else {
-                    \Idno\Core\site()->logging->log("No user");
                 }
 
                 return false;
@@ -119,7 +124,7 @@
             function getRegistrationToken()
             {
                 if (empty(site()->config->hub_settings)) {
-                    site()->config->hub_settings = [];
+                    site()->config->hub_settings = array();
                 }
                 if (!empty(site()->config->hub_settings['registration_token'])) {
                     if (!empty(site()->config->hub_settings['registration_token_expiry'])) {
@@ -128,7 +133,7 @@
                         }
                     }
                 }
-                $token_generator                                   = new \OAuthProvider([]);
+                $token_generator                                   = new \OAuthProvider(array());
                 $token                                             = $token_generator->generateToken(32);
                 $config                                            = site()->config;
                 $config->hub_settings['registration_token']        = bin2hex($token);
@@ -156,11 +161,11 @@
 
                     $web_client = new Webservice();
 
-                    $results = $web_client->post($this->server . 'hub/site/register', [
+                    $results = $web_client->post($this->server . 'hub/site/register', array(
                         'url'   => site()->config()->getURL(),
                         'title' => site()->config()->getTitle(),
                         'token' => $this->getRegistrationToken()
-                    ]);
+                    ));
 
                     if ($results['response'] == 200) {
                         site()->config->load();
@@ -192,12 +197,22 @@
                     $contents   = json_encode($user);
                     $time       = time();
                     $details    = $this->loadDetails();
-                    $results    = $web_client->post($this->server . 'hub/user/register', [
+                    $results    = $web_client->post($this->server . 'hub/user/register', array(
                         'content'    => $contents,
                         'time'       => $time,
                         'auth_token' => $details['auth_token'],
                         'signature'  => hash_hmac('sha1', $contents . $time . $details['auth_token'], $details['secret'])
-                    ]);
+                    ));
+
+                    if ($results['response'] == 401) {
+                        site()->config->hub_settings = false;
+                        site()->config->save();
+                        $user->hub_settings = false;
+                        $user->save();
+                        if ($user->getUUID() == site()->session()->currentUserUUID()) {
+                            site()->session()->refreshSessionUser($user);
+                        }
+                    }
 
                     return true;
                 }
@@ -226,12 +241,12 @@
                         $contents   = json_encode($contents);
                         $time       = time();
                         $details    = $user->hub_settings;
-                        $results    = $web_client->post($this->server . $endpoint, [
+                        $results    = $web_client->post($this->server . $endpoint, array(
                             'content'    => $contents,
                             'time'       => $time,
                             'auth_token' => $details['token'],
                             'signature'  => hash_hmac('sha1', $contents . $time . $details['token'], $details['secret'])
-                        ]);
+                        ));
 
                         return $results;
                     }
@@ -273,9 +288,11 @@
             function getRemoteLink($endpoint, $callback)
             {
                 $user = site()->session()->currentUser();
+                $user = User::getByUUID($user->getUUID());
+                site()->session()->refreshSessionUser($user);
 
                 if ($this->userIsRegistered($user)) {
-                    $results = $this->makeCall('hub/user/link', ['user' => $user->getUUID(), 'endpoint' => $endpoint, 'callback' => $callback]);
+                    /*$results = $this->makeCall('hub/user/link', array('user' => $user->getUUID(), 'endpoint' => $endpoint, 'callback' => $callback));
                     if (!empty($results['content'])) {
                         $content = json_decode($results['content'], true);
                     }
@@ -285,6 +302,12 @@
                         $signature  = hash_hmac('sha1', $link_token . $time, $user->hub_settings['secret']);
 
                         return $this->server . $endpoint . '?token=' . urlencode($link_token) . '&time=' . $time . '&signature=' . $signature;
+                    }*/
+
+                    if (!empty($user->hub_settings['token'])) {
+                        $time = time();
+                        $signature  = hash_hmac('sha1', $user->hub_settings['token'] . $time, $user->hub_settings['secret']);
+                        return $this->server . $endpoint . '?token=' . urlencode($user->hub_settings['token']) . '&time=' . $time . '&signature=' . $signature;
                     }
                 }
 

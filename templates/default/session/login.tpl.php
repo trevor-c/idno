@@ -7,7 +7,7 @@
             Sign in
         </h3>
 
-        <form action="<?= \Idno\Core\site()->config()->url ?>session/login" method="post">
+        <form action="<?= \Idno\Core\site()->config()->getDisplayURL() ?>session/login" method="post">
             <div class="control-group">
                 <div class="controls">
                     <input type="text" id="inputEmail" name="email" placeholder="Your email address"
@@ -28,7 +28,7 @@
                         } else if (!empty($_SERVER['HTTP_REFERER'])) {
                             echo htmlspecialchars($_SERVER['HTTP_REFERER']);
                         } else {
-                            echo \Idno\Core\site()->config()->url;
+                            echo \Idno\Core\site()->config()->getDisplayURL();
                         }?>" />
                 </div>
             </div>
@@ -36,13 +36,13 @@
               <div class="control-group">
                 <div class="controls">
                     <?php
-                        if (\Idno\Core\site()->config()->open_registration == true) {
+                        if (\Idno\Core\site()->config()->open_registration == true && \Idno\Core\site()->config()->canAddUsers()) {
                     ?>
-                    <a href="<?=\Idno\Core\site()->config()->getURL()?>account/register">New here? Register for an account.</a><br><br>
+                    <a href="<?=\Idno\Core\site()->config()->getDisplayURL()?>account/register">New here? Register for an account.</a><br><br>
                     <?php
                         }
                     ?>
-                    <a href="<?=\Idno\Core\site()->config()->getURL()?>account/password">Forgot your password?</a>
+                    <a href="<?=\Idno\Core\site()->config()->getDisplayURL()?>account/password">Forgot your password?</a>
                 </div>
             </div>
             <?= \Idno\Core\site()->actions()->signForm('/session/login') ?>

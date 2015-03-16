@@ -3,13 +3,13 @@
 
     if (!empty($vars['object']->inreplyto)) {
         if (!is_array($vars['object']->inreplyto)) {
-            $vars['object']->inreplyto = [$vars['object']->inreplyto];
+            $vars['object']->inreplyto = array($vars['object']->inreplyto);
         }
     } else {
-        $vars['object']->inreplyto = [];
+        $vars['object']->inreplyto = array();
     }
     if (!empty($vars['url'])) {
-        $vars['object']->inreplyto = [$vars['url']];
+        $vars['object']->inreplyto = array($vars['url']);
     }
 
 ?>
@@ -35,15 +35,17 @@
                 ?>
             </h4>
 
-            <textarea required name="body" id="body" class="content-entry mentionable span8" placeholder="What's going on?"><?php
+            <textarea required name="body" id="body" class="content-entry mentionable span8" placeholder="Share a quick note or comment. You can use links and hashtags."><?php
                         
                 if (!empty($vars['body'])) {
                     echo htmlspecialchars($vars['body']);
                 } else {
                     echo htmlspecialchars($vars['object']->body);
                 } ?></textarea>
-            
             <?php
+
+                echo $this->draw('entity/tags/input');
+
             // Set focus so you can start typing straight away (on shares)
             if (\Idno\Core\site()->currentPage()->getInput('share_url')) {
             ?>
@@ -62,15 +64,10 @@
             <?php
             }
             ?>
-                    <label>
-                        Tags <br/>
-                        <input type="text" name="tags" id="tags" placeholder="Add some #tags"
-                               value="<?= htmlspecialchars($vars['object']->tags) ?>" class="span8"/>
-                    </label>
 
             <p>
                 <small><a id="inreplyto-add" href="#"
-                          onclick="$('#inreplyto').append('<span><input required type=&quot;url&quot; name=&quot;inreplyto[]&quot; value=&quot;&quot; placeholder=&quot;Add the URL that you\'re replying to&quot; class=&quot;span8&quot; /> <small><a href=&quot;#&quot; onclick=&quot;$(this).parent().parent().remove(); return false;&quot;><icon class=&quot;icon-remove&quot;></icon> Remove URL</a></small><br /></span>'); return false;"><icon class="icon-reply"></icon>
+                          onclick="$('#inreplyto').append('<span><input required type=&quot;url&quot; name=&quot;inreplyto[]&quot; value=&quot;&quot; placeholder=&quot;Add the URL that you\'re replying to&quot; class=&quot;span8&quot; onchange=&quot;adjust_content(this.value)&quot; /> <small><a href=&quot;#&quot; onclick=&quot;$(this).parent().parent().remove(); return false;&quot;><icon class=&quot;icon-remove&quot;></icon> Remove URL</a></small><br /></span>'); return false;"><icon class="icon-reply"></icon>
                         Reply to a site</a></small>
             </p>
             <div id="inreplyto">
@@ -81,7 +78,7 @@
                             <p>
                                 <input type="url" name="inreplyto[]"
                                        placeholder="Add the URL that you're replying to"
-                                       class="span8" value="<?= htmlspecialchars($inreplyto) ?>"/>
+                                       class="span8 inreplyto" value="<?= htmlspecialchars($inreplyto) ?>" onchange="adjust_content(this.value)"/>
                                 <small><a href="#"
                                           onclick="$(this).parent().parent().remove(); return false;"><icon class="icon-remove"></icon> 
                                           Remove URL</a></small>
@@ -92,10 +89,6 @@
                 ?>
             </div>
 
-        </div>
-        <div class="span8 offset2">
-
-
             <?php if (empty($vars['object']->_id)) echo $this->drawSyndication('note'); ?>
             <p class="button-bar">
                 <?= \Idno\Core\site()->actions()->signForm('/status/edit') ?>
@@ -103,14 +96,6 @@
                 <input type="button" class="btn btn-cancel" value="Cancel" onclick="hideContentCreateForm();"/>
                 <input type="submit" class="btn btn-primary" value="Publish"/>
             </p>
-            <!--<p>
-                <small><a href="#" onclick="$('#bookmarklet').toggle(); return false;">Get a button for your browser</a></small>
-            </p>
-
-            <div id="bookmarklet" style="display:none;">
-                <p>Drag the following link into your browser links bar to easily share links or reply to posts on other sites:</p>
-                <?=$this->draw('entity/bookmarklet'); ?>
-            </div>  --> 
         </div>
         <div class="span2">
             <p id="counter" style="display:none">
@@ -122,26 +107,38 @@
     </div>
 </form>
 <script>
+    function adjust_content(url) {
+        var username = url.match(/https?:\/\/(www\.)?twitter\.com\/(#!\/)?@?([^\/]*)/)[3];
+        if (username != null) {
+            if ($('#body').val().search('@' + username) == -1) {
+                $('#body').val('@' + username + ' ' + $('#body').val());
+                count_chars();
+            }
+        }
+    }
+
+    function count_chars() {
+        var len = $('#body').val().length;
+
+        if (len > 0) {
+            if (!$('#counter').is(":visible")) {
+                $('#counter').fadeIn();
+            }
+        }
+
+        $('#counter .count').text(len);
+    }
+
     $(document).ready(function () {
         $('#body').keyup(function () {
-            var len = $(this).val().length;
-
-            if (len > 0) {
-                if (!$('#counter').is(":visible")) {
-                    $('#counter').fadeIn();
-                }
-            }
-
-            $('#counter .count').text(len);
-
-
+            count_chars();
         });
-        
+
         // Make in reply to a little less painful
         $("#inreplyto-add").on('dragenter', function(e) {
             e.stopPropagation();
             e.preventDefault();
-            $('#inreplyto').append('<span><input required type="url" name="inreplyto[]" value="" placeholder="The website address of the post you\'re replying to" class="span8" /> <small><a href="#" onclick="$(this).parent().parent().remove(); return false;">Remove</a></small><br /></span>');
+            $('#inreplyto').append('<span><input required type="url" name="inreplyto[]" value="" placeholder="The website address of the post you\'re replying to" class="span8 inreplyto" onchange="adjust_content(this.value)" /> <small><a href="#" onclick="$(this).parent().parent().remove(); return false;">Remove</a></small><br /></span>');
         });
     });
 </script>

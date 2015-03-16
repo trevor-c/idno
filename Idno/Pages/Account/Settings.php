@@ -24,38 +24,38 @@
             function postContent()
             {
                 $this->createGatekeeper(); // Logged-in only please
-                $user = \Idno\Core\site()->session()->currentUser();
-                $name = $this->getInput('name');
-                $email     = $this->getInput('email');
-                $password  = trim($this->getInput('password'));
+                $user     = \Idno\Core\site()->session()->currentUser();
+                $name     = $this->getInput('name');
+                $email    = $this->getInput('email');
+                $password = trim($this->getInput('password'));
+                $username = trim($this->getInput('handle'));
+                
+                /*if (!\Idno\Common\Page::isSSL() && !\Idno\Core\site()->config()->disable_cleartext_warning) {
+                    \Idno\Core\site()->session()->addErrorMessage("Warning: Access credentials were sent over a non-secured connection! To disable this warning set disable_cleartext_warning in your config.ini");
+                }*/
 
                 if (!empty($name)) {
                     $user->setTitle($name);
+                }
+
+                if (!empty($username) && $username != $user->getHandle()) {
+                    $user->setHandle($username);
                 }
 
                 if (!empty($email) && $email != $user->email && filter_var($email, FILTER_VALIDATE_EMAIL)) {
                     if (!\Idno\Entities\User::getByEmail($email)) {
                         $user->email = $email;
                     } else {
-                        \Idno\Core\site()->session()->addMessage('Someone is already using ' . $email . ' as their email address.', 'alert-error');
+                        \Idno\Core\site()->session()->addErrorMessage('Someone is already using ' . $email . ' as their email address.');
                     }
                 }
 
                 if (!empty($password)) {
-                    $user->setPassword($password);
-                }
-
-                if (!empty($_FILES['avatar'])) {
-                    if (in_array($_FILES['avatar']['type'], array('image/png', 'image/jpg', 'image/jpeg', 'image/gif'))) {
-                        if (getimagesize($_FILES['avatar']['tmp_name'])) {
-                            if ($icon = \Idno\Entities\File::createThumbnailFromFile($_FILES['avatar']['tmp_name'], $_FILES['avatar']['name'], 300)) {
-                                $user->icon = (string)$icon;
-                                \Idno\Core\site()->session()->addMessage("Your user picture was updated.");
-                            } else if ($icon = \Idno\Entities\File::createFromFile($_FILES['avatar']['tmp_name'], $_FILES['avatar']['name'])) {
-                                $user->icon = (string)$icon;
-                                \Idno\Core\site()->session()->addMessage("Your user picture was updated.");
-                            }
-                        }
+                    if (\Idno\Entities\User::checkNewPasswordStrength($password)) {
+                        \Idno\Core\site()->session()->addMessage("Your password has been updated.");
+                        $user->setPassword($password);
+                    } else {
+                        \Idno\Core\site()->session()->addErrorMessage('Sorry, your password is too weak');
                     }
                 }
 

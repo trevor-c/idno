@@ -36,11 +36,12 @@
                 $object = parent::jsonSerialize();
 
                 // Add some thumbs
-                $object['thumbnails'] = [];
-                $sizes                = \Idno\Core\site()->events()->dispatch('photo/thumbnail/getsizes', new \Idno\Core\Event(array('sizes' => ['large' => 800, 'medium' => 400, 'small' => 200])));
-                foreach ($sizes->data()['sizes'] as $label => $size) {
+                $object['thumbnails'] = array();
+                $sizes                = \Idno\Core\site()->events()->dispatch('photo/thumbnail/getsizes', new \Idno\Core\Event(array('sizes' => array('large' => 800, 'medium' => 400, 'small' => 200))));
+                $eventdata = $sizes->data();
+                foreach ($eventdata['sizes'] as $label => $size) {
                     $varname                      = "thumbnail_{$label}";
-                    $object['thumbnails'][$label] = $this->$varname;
+                    $object['thumbnails'][$label] = preg_replace('/^(https?:\/\/\/)/', \Idno\Core\site()->config()->url, $this->$varname);
                 }
 
                 return $object;
@@ -58,6 +59,13 @@
                 } else {
                     $new = false;
                 }
+
+                if ($new) {
+                    if (!\Idno\Core\site()->triggerEvent("file/upload",[],true)) {
+                        return false;
+                    }
+                }
+
                 $this->title = \Idno\Core\site()->currentPage()->getInput('title');
                 $this->body  = \Idno\Core\site()->currentPage()->getInput('body');
                 $this->tags  = \Idno\Core\site()->currentPage()->getInput('tags');
@@ -73,18 +81,33 @@
                 if ($new) {
                     if (!empty($_FILES['photo']['tmp_name'])) {
                         if (\Idno\Entities\File::isImage($_FILES['photo']['tmp_name'])) {
-                            if ($photo = \Idno\Entities\File::createFromFile($_FILES['photo']['tmp_name'], $_FILES['photo']['name'], $_FILES['photo']['type'], true)) {
+                            
+                            // Extract exif data so we can rotate
+                            if (is_callable('exif_read_data') && $_FILES['photo']['type'] == 'image/jpeg') {
+                                try {
+                                    if ($exif = exif_read_data($_FILES['photo']['tmp_name'])) {
+                                        $this->exif = base64_encode(serialize($exif)); // Yes, this is rough, but exif contains binary data that can not be saved in mongo
+                                    }
+                                } catch (\Exception $e) {
+                                    $exif = false;
+                                }
+                            } else {
+                                $exif = false;
+                            }
+                            
+                            if ($photo = \Idno\Entities\File::createFromFile($_FILES['photo']['tmp_name'], $_FILES['photo']['name'], $_FILES['photo']['type'], true, true)) {
                                 $this->attachFile($photo);
 
                                 // Now get some smaller thumbnails, with the option to override sizes
-                                $sizes = \Idno\Core\site()->events()->dispatch('photo/thumbnail/getsizes', new \Idno\Core\Event(array('sizes' => ['large' => 800, 'medium' => 400, 'small' => 200])));
-                                foreach ($sizes->data()['sizes'] as $label => $size) {
+                                $sizes = \Idno\Core\site()->events()->dispatch('photo/thumbnail/getsizes', new \Idno\Core\Event(array('sizes' => array('large' => 800, 'medium' => 400, 'small' => 200))));
+                                $eventdata = $sizes->data();
+                                foreach ($eventdata['sizes'] as $label => $size) {
 
                                     $filename = $_FILES['photo']['name'];
 
                                     // Experiment: let's not save thumbnails for GIFs, in order to enable animated GIF posting.
                                     if ($_FILES['photo']['type'] != 'image/gif') {
-                                        if ($thumbnail = \Idno\Entities\File::createThumbnailFromFile($_FILES['photo']['tmp_name'], "{$filename}_{$label}", $size)) {
+                                        if ($thumbnail = \Idno\Entities\File::createThumbnailFromFile($_FILES['photo']['tmp_name'], "{$filename}_{$label}", $size, false, $exif)) {
                                             $varname        = "thumbnail_{$label}";
                                             $this->$varname = \Idno\Core\site()->config()->url . 'file/' . $thumbnail;
 
@@ -95,22 +118,19 @@
                                 }
 
                             } else {
-                                \Idno\Core\site()->session()->addMessage('Image wasn\'t attached.');
+                                \Idno\Core\site()->session()->addErrorMessage('Image wasn\'t attached.');
                             }
                         } else {
-                            \Idno\Core\site()->session()->addMessage('This doesn\'t seem to be an image ..');
+                            \Idno\Core\site()->session()->addErrorMessage('This doesn\'t seem to be an image ..');
                         }
                     } else {
-                        \Idno\Core\site()->session()->addMessage('We couldn\'t access your image. Please try again.');
+                        \Idno\Core\site()->session()->addErrorMessage('We couldn\'t access your image. Please try again.');
 
                         return false;
                     }
                 }
 
-                if ($this->save()) {
-                    if ($new) {
-                        $this->addToFeed();
-                    } // Add it to the Activity Streams feed
+                if ($this->save($new)) {
                     \Idno\Core\Webmention::pingMentions($this->getURL(), \Idno\Core\site()->template()->parseURLs($this->getTitle() . ' ' . $this->getDescription()));
 
                     return true;

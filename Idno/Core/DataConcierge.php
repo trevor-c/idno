@@ -53,12 +53,15 @@
              */
             function handleSession()
             {
-                $sessionHandler = new \Symfony\Component\HttpFoundation\Session\Storage\Handler\MongoDbSessionHandler(\Idno\Core\site()->db()->getClient(), [
+                session_save_path(site()->config()->session_path);
+                ini_set('session.gc_probability', 1);
+                
+                /*$sessionHandler = new \Symfony\Component\HttpFoundation\Session\Storage\Handler\MongoDbSessionHandler(\Idno\Core\site()->db()->getClient(), [
                     'database'   => 'idnosession',
                     'collection' => 'idnosession'
                 ]);
 
-                session_set_save_handler($sessionHandler, true);
+                session_set_save_handler($sessionHandler, true);*/
             }
 
             /**
@@ -214,9 +217,9 @@
                 // and remove subtypes that have an exclamation mark before them
                 // from consideration
                 if (!empty($subtypes)) {
-                    $not = [];
+                    $not = array();
                     if (!is_array($subtypes)) {
-                        $subtypes = [$subtypes];
+                        $subtypes = array($subtypes);
                     }
                     foreach ($subtypes as $key => $subtype) {
                         if (substr($subtype, 0, 1) == '!') {
@@ -295,13 +298,30 @@
             }
 
             /**
+             * Export a collection to JSON.
+             * @param string $collection
+             * @return bool|string
+             */
+            function exportRecords($collection = 'entities')
+            {
+                try {
+                    if ($result = $this->database->$collection->find()) {
+                        return json_encode(iterator_to_array($result));
+                    }
+                } catch (\Exception $e) {
+                    return false;
+                }
+                return false;
+            }
+
+            /**
              * Count objects of a certain kind that we're allowed to see
              *
              * @param string|array $subtypes String or array of subtypes we're allowed to see
              * @param array $search Any extra search terms in array format (eg array('foo' => 'bar')) (default: empty)
              * @param string $collection Collection to query; default: entities
              */
-            function countObjects($subtypes = '', $search = [], $collection = 'entities')
+            function countObjects($subtypes = '', $search = array(), $collection = 'entities')
             {
 
                 // Initialize query parameters to be an empty array
@@ -311,9 +331,9 @@
                 // and remove subtypes that have an exclamation mark before them
                 // from consideration
                 if (!empty($subtypes)) {
-                    $not = [];
+                    $not = array();
                     if (!is_array($subtypes)) {
-                        $subtypes = [$subtypes];
+                        $subtypes = array($subtypes);
                     }
                     foreach ($subtypes as $key => $subtype) {
                         if (substr($subtype, 0, 1) == '!') {
@@ -360,9 +380,9 @@
              * @param string $id
              * @return true|false
              */
-            function deleteRecord($id)
+            function deleteRecord($id, $collection = 'entities')
             {
-                return $this->database->entities->remove(array("_id" => new \MongoId($id)));
+                return $this->database->$collection->remove(array("_id" => new \MongoId($id)));
             }
 
             /**
@@ -388,7 +408,7 @@
             {
                 $regexObj = new \MongoRegex("/" . addslashes($query) . "/i");
 
-                return ['$or' => [['body' => $regexObj], ['title' => $regexObj], ['tags' => $regexObj], ['description' => $regexObj]]];
+                return array('$or' => array(array('body' => $regexObj), array('title' => $regexObj), array('tags' => $regexObj), array('description' => $regexObj)));
             }
 
         }

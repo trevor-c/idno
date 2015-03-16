@@ -19,20 +19,8 @@
                     \Idno\Core\site()->session()->addMessage($messages);
                 }
 
-                $this->forward(\Idno\Core\site()->config()->getURL());
+                $this->forward(\Idno\Core\site()->config()->getDisplayURL());
 
-/*
-                $t = \Idno\Core\site()->template();
-                echo $t->__(array(
-
-                    'title' => "Publish your first story!",
-                    'body'  => $t->__([
-                            'user'         => $user,
-                            'contentTypes' => \Idno\Common\ContentType::getRegistered()
-                        ])->draw('onboarding/publish'),
-
-                ))->drawPage();
-*/
             }
 
         }

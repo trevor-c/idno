@@ -10,14 +10,30 @@
 <div class="">
 
     <h2 class="p-geo">
-        <a href="<?= $object->getURL() ?>" class="p-name"><?= $object->getTitle() ?></a>
+        <?php
+            if (\Idno\Core\site()->template()->getTemplateType() == 'default') {
+                ?>
+                <a href="<?= $object->getURL() ?>" class="p-name"><?= $object->getTitle() ?></a>
+            <?php
+
+            }
+
+            ?>
         <span class="h-geo">
             <data class="p-latitude" value="<?= $object->lat ?>"></data>
-        <data class="p-longitude" value="<?= $object->long ?>"></data>
+            <data class="p-longitude" value="<?= $object->long ?>"></data>
         </span>
     </h2>
 
-    <div id="map_<?= $object->_id ?>" style="height: 250px"></div>
+<?php
+
+    if (\Idno\Core\site()->template()->getTemplateType() == 'default') {
+
+        ?>
+        <div id="map_<?= $object->_id ?>" style="height: 250px"></div>
+    <?php
+    }
+    ?>
     <div class="p-map">
         <?php
             if (!empty($object->body)) {
@@ -33,6 +49,11 @@
     </div>
 
 </div>
+<?php
+
+    if (\Idno\Core\site()->template()->getTemplateType() == 'default') {
+
+        ?>
 <script>
     var map<?=$object->_id?> = L.map('map_<?=$object->_id?>', {touchZoom: false, scrollWheelZoom: false}).setView([<?=$object->lat?>, <?=$object->long?>], 16);
     /*
@@ -93,4 +114,5 @@
     map<?=$object->_id?>.scrollWheelZoom.disable();
     map<?=$object->_id?>.touchZoom.disable();
     map<?=$object->_id?>.doubleClickZoom.disable();
-</script>
+</script><?php
+    }

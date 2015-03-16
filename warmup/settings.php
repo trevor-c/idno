@@ -22,11 +22,6 @@
         $mysql_host = 'localhost';
     }
 
-    if (file_exists('../config.ini')) {
-        header('Location: ../begin/register?set_name=' . urlencode($site_title));
-        exit;
-    }
-
     if (!empty($mysql_name) && !empty($mysql_host)) {
         try {
             $dbh = new PDO('mysql:host=' . $mysql_host . ';dbname=' . $mysql_name, $mysql_user, $mysql_pass);
@@ -42,6 +37,11 @@
             $messages .= '<blockquote><p>' . $e->getMessage() . '</p></blockquote>';
             $ok = false;
         }
+    }
+
+    if (file_exists('../config.ini') && $ok) {
+        header('Location: ../begin/register?set_name=' . urlencode($site_title));
+        exit;
     }
 
     if (!empty($upload_path)) {
@@ -89,6 +89,13 @@ uploadpath = '{$upload_path}'
 END;
 
         try {
+            if (file_exists(dirname(dirname(__FILE__)) . '/.htaccess')) {
+                if ($fp = @fopen(dirname(dirname(__FILE__)) . '/.htaccess', 'a')) {
+                    fwrite($fp, "\n\n\n" . file_get_contents(dirname(dirname(__FILE__)) . '/htaccess.dist'));
+                }
+            } else {
+                @rename(dirname(dirname(__FILE__)) . '/htaccess.dist', dirname(dirname(__FILE__)) . '/.htaccess');
+            }
             if ($fp = @fopen('../config.ini', 'w')) {
                 fwrite($fp, $ini_file);
                 fclose($fp);
@@ -103,6 +110,11 @@ END;
             exit;
         }
 
+    }
+
+    if (empty($upload_path)) {
+        // New default upload path
+        $upload_path = dirname(dirname(__FILE__)) . '/Uploads/';
     }
 
     $title = 'Settings';
@@ -162,6 +174,9 @@ END;
                 <p class="control-label">
                     Known needs a single MySQL database, with a user that can connect to it. We recommend that this
                     is a user you have created just for Known, rather than one you share with other applications.
+                    <br><br>
+                    You should create your database before entering the details here. If you're using a shared host,
+                    you may have an option called "MySQL Database Wizard" that will speed you through the process.
                 </p>
                 <p>
                     <label class="control-label">
@@ -201,8 +216,10 @@ END;
 
                 <p>
                     <label class="control-label" for="upload_path">
-                        The full path to a folder that Known can upload to. This shouldn't be in your web server's
-                        document root. Your web server does need to be able to read and write to it.
+                        The full path to a folder that Known can upload to. By default this is the "Uploads" folder -
+                        you should leave this as-is unless you're an experienced system administrator. You need to make
+                        sure the web server can save data to it. In your file manager, you should be able
+                        to select the folder, and click to enable "group" write access.
                     </label>
                 </p>
 

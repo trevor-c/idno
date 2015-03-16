@@ -19,6 +19,7 @@
 
             // Which collection should this be stored in?
             public $collection = 'entities';
+            static $retrieve_collection = 'entities';
 
             // Store the entity's attributes
             public $attributes = array(
@@ -34,7 +35,6 @@
             {
                 if (\Idno\Core\site()->session()) {
                     if ($user = \Idno\Core\site()->session()->currentUser()) {
-                        //var_export(\Idno\Core\site()->session()->currentUser());
                         $this->setOwner(\Idno\Core\site()->session()->currentUser());
                     }
                 }
@@ -88,7 +88,7 @@
              * @param array $search List of filter terms (default: none)
              * @return int
              */
-            static function count($search = [])
+            static function count($search = array())
             {
                 return \Idno\Core\site()->db()->countObjects(get_called_class(), $search);
             }
@@ -99,9 +99,9 @@
              * @param array $search
              * @return int
              */
-            static function countFromAll($search = [])
+            static function countFromAll($search = array())
             {
-                return self::countFromX('', $search);
+                return static::countFromX('', $search);
             }
 
             /**
@@ -111,7 +111,7 @@
              * @param array $search
              * @return int
              */
-            static function countFromX($class, $search = [])
+            static function countFromX($class, $search = array())
             {
                 return \Idno\Core\site()->db()->countObjects($class, $search);
             }
@@ -127,7 +127,7 @@
 
             static function getOne($search = array(), $fields = array())
             {
-                if ($records = self::get($search, $fields, 1))
+                if ($records = static::get($search, $fields, 1))
                     foreach ($records as $record)
                         return $record;
 
@@ -147,7 +147,7 @@
 
             static function get($search = array(), $fields = array(), $limit = 10, $offset = 0)
             {
-                return \Idno\Core\site()->db()->getObjects(get_called_class(), $search, $fields, $limit, $offset);
+                return \Idno\Core\site()->db()->getObjects(get_called_class(), $search, $fields, $limit, $offset, static::$retrieve_collection);
             }
 
             /**
@@ -159,7 +159,7 @@
             static function getByID($id)
             {
                 try {
-                    return self::getOneFromAll(array('_id' => \Idno\Core\site()->db()->processID($id)));
+                    return static::getOneFromAll(array('_id' => \Idno\Core\site()->db()->processID($id)));
                 } catch (\Exception $e) {
                     return false; //\Idno\Core\site()->currentPage()->noContent();
                 }
@@ -176,7 +176,7 @@
 
             static function getOneFromAll($search = array(), $fields = array())
             {
-                if ($records = self::getFromAll($search, $fields, 1))
+                if ($records = static::getFromAll($search, $fields, 1))
                     foreach ($records as $record)
                         return $record;
 
@@ -195,7 +195,7 @@
              */
             static function getFromAll($search = array(), $fields = array(), $limit = 10, $offset = 0)
             {
-                $result = self::getFromX('', $search, $fields, $limit, $offset);
+                $result = static::getFromX('', $search, $fields, $limit, $offset);
 
                 return $result;
             }
@@ -213,7 +213,7 @@
              */
             static function getFromX($class, $search = array(), $fields = array(), $limit = 10, $offset = 0)
             {
-                $result = \Idno\Core\site()->db()->getObjects($class, $search, $fields, $limit, $offset);
+                $result = \Idno\Core\site()->db()->getObjects($class, $search, $fields, $limit, $offset, static::$retrieve_collection);
 
                 return $result;
             }
@@ -236,11 +236,7 @@
 
             static function getByUUID($uuid)
             {
-                //if (self::isLocalUUID($uuid)) {
-                return self::getOneFromAll(array('uuid' => $uuid));
-                //} else {
-                //    return self::getRemote($uuid);
-                //}
+                return static::getOneFromAll(array('uuid' => $uuid));
             }
 
             /**
@@ -352,6 +348,7 @@
                 $activityStreamPost->setTitle(sprintf($title, $owner->getTitle(), $this->getTitle()));
                 $activityStreamPost->setVerb('post');
                 $activityStreamPost->setObject($this);
+                $activityStreamPost->created = $this->created;
 
                 return $activityStreamPost->save();
             }
@@ -388,8 +385,13 @@
 
             function getTitle()
             {
-                if (!empty($this->title))
+                if (!empty($this->title)) {
+                    if (is_array($this->title)) {
+                        $this->title = trim(implode(' ', $this->title));
+                    }
+
                     return $this->title;
+                }
 
                 return get_class($this) . ' ' . $this->_id;
             }
@@ -413,9 +415,12 @@
             /**
              * Saves this entity - either creating a new entry, or
              * overwriting the existing one.
+             *
+             * @param bool $add_to_feed If set to true, will add this item to the activity stream feed if this object is being newly created
+             * @param string $feed_verb If this item is added to the feed, this is the verb that will be used
              */
 
-            function save()
+            function save($add_to_feed = false, $feed_verb = 'post')
             {
 
                 // Adding this entity's owner (if we don't know already)
@@ -440,8 +445,15 @@
                 $page = \Idno\Core\site()->currentPage();
                 if (!empty($page)) {
                     $access = $page->getInput('access');
-                    if (!empty($access))
+                    if (!empty($access)) {
                         $this->access = $access;
+                    }
+                    /*$syndication = $page->getInput('syndication');
+                    if (!empty($syndication) && is_array($syndication)) {
+                        foreach($syndication as $label => $url) {
+                            $this->setPosseLink($label, $url);
+                        }
+                    }*/
                 }
 
                 // Adding when this entity was created (if it's new) & updated
@@ -463,6 +475,9 @@
                         $this->_id  = $result;
                         $this->uuid = $this->getUUID();
                         \Idno\Core\site()->db()->saveObject($this);
+                        if ($add_to_feed) {
+                            $this->addToFeed($feed_verb);
+                        }
                         $this->syndicate();
                         $event = new \Idno\Core\Event(array('object' => $this));
                         \Idno\Core\site()->events()->dispatch('saved', $event);
@@ -483,8 +498,13 @@
             {
                 if ($this->getActivityStreamsObjectType()) {
                     $event = new \Idno\Core\Event(array('object' => $this, 'object_type' => $this->getActivityStreamsObjectType()));
-                    \Idno\Core\site()->events()->dispatch('post/' . $this->getActivityStreamsObjectType(), $event);
-                    \Idno\Core\site()->events()->dispatch('syndicate', $event);
+                    try {
+                        \Idno\Core\site()->events()->dispatch('post/' . $this->getActivityStreamsObjectType(), $event);
+                        \Idno\Core\site()->events()->dispatch('syndicate', $event);
+                    } catch (\Exception $e) {
+                        \Idno\Core\site()->session()->addErrorMessage("There was a problem syndicating.");
+                        \Idno\Core\site()->logging()->log($e->getMessage());
+                    }
                 }
             }
 
@@ -570,6 +590,9 @@
                 $slug = preg_replace("/[ ]+/", ' ', $slug);
                 $slug = implode('-', array_slice(explode(' ', $slug), 0, $max_pieces));
                 $slug = str_replace(' ', '-', $slug);
+                if (empty($slug)) {
+                    $slug = 'untitled';
+                }
 
                 return $slug;
             }
@@ -583,7 +606,7 @@
              */
             function setSlug($slug, $max_pieces = 10)
             {
-                $plugin_slug = \Idno\Core\site()->triggerEvent('entity/slug', ['object' => $this]);
+                $plugin_slug = \Idno\Core\site()->triggerEvent('entity/slug', array('object' => $this));
                 if (!empty($plugin_slug) && $plugin_slug !== true) {
                     return $plugin_slug;
                 }
@@ -612,7 +635,7 @@
                     return false;
                 }
 
-                return self::getOneFromAll(array('slug' => $slug));
+                return static::getOneFromAll(array('slug' => $slug));
             }
 
             /**
@@ -624,7 +647,7 @@
 
             function getActivityStreamsObjectType()
             {
-                return 'article';
+                return 'entity';
             }
 
             /**
@@ -635,7 +658,7 @@
             function getRelatedFeedItems($verb = 'post')
             {
 
-                $results = [];
+                $results = array();
 
                 if ($this instanceof \Idno\Entities\ActivityStreamPost && $this->verb == $verb) {
                     $results[] = $this;
@@ -690,9 +713,27 @@
             function getAttachments()
             {
                 if (!empty($this->attachments)) {
+                    if (!empty(\Idno\Core\site()->config()->attachment_base_host)) {
+                        $attachments = $this->attachments;
+                        foreach ($this->attachments as $key => $value) {
+                            if (!empty($value['url'])) {
+                                $host              = parse_url($value['url'], PHP_URL_HOST);
+                                $value['url']      = str_replace($host, \Idno\Core\site()->config()->attachment_base_host, $value['url']);
+                                if (empty($value['filename'])) {
+                                    $value['filename'] = basename($value['url']);
+                                }
+                                if (empty($value['mime_type'])) {
+                                    $value['mime_type'] = 'application/octet-stream';
+                                }
+                                $attachments[$key] = $value;
+                            }
+                        }
+                        $this->attachments = $attachments;
+                    }
+
                     return $this->attachments;
                 } else {
-                    return [];
+                    return array();
                 }
             }
 
@@ -715,7 +756,7 @@
                         }
                     }
 
-                    if ($return = \Idno\Core\db()->deleteRecord($this->getID())) {
+                    if ($return = \Idno\Core\db()->deleteRecord($this->getID(), $this->collection)) {
                         $this->deleteData();
 
                         return $return;
@@ -733,6 +774,21 @@
             function getID()
             {
                 return $this->_id;
+            }
+
+            /**
+             * Retrieves an icon for this entity
+             * @return mixed|string
+             */
+            function getIcon()
+            {
+                if ($user = $this->getOwner()) {
+                    return $user->getIcon();
+                }
+                if ($page = \Idno\Core\site()->currentPage()) {
+                    return $page->getIcon();
+                }
+                return \Idno\Core\site()->config()->getDisplayURL() . 'gfx/logos/logo_k.png';
             }
 
             /**
@@ -827,7 +883,7 @@
                     }
                 }
 
-                return [];
+                return array();
             }
 
             /**
@@ -862,7 +918,7 @@
              */
             function getImageSourcesFromBody()
             {
-                $src = [];
+                $src = array();
                 if ($body = $this->getBody()) {
                     $doc = new \DOMDocument();
                     $doc->loadHTML($body);
@@ -922,12 +978,15 @@
              * @param $url
              * @return bool
              */
-            function setPosseLink($service, $url)
+            function setPosseLink($service, $url, $identifier = '')
             {
                 if (!empty($service) && !empty($url)) {
-                    $posse           = $this->posse;
-                    $posse[$service] = $url;
-                    $this->posse     = $posse;
+                    $posse = $this->posse;
+                    if (empty($identifier)) {
+                        $identifier = $service;
+                    }
+                    $posse[$service][] = array('url' => $url, 'identifier' => $identifier);
+                    $this->posse       = $posse;
 
                     return true;
                 }
@@ -946,7 +1005,7 @@
                     return $this->posse;
                 }
 
-                return [];
+                return array();
             }
 
             /**
@@ -1004,7 +1063,7 @@
 
                 $seed = rand(0, 99999999);
                 $code = shorten($seed);
-                while ($entity = self::getByShortURL($code)) {
+                while ($entity = static::getByShortURL($code)) {
                     $code = shorten(rand(0, 99999999));
                 }
                 $this->shorturl = $code;
@@ -1025,7 +1084,7 @@
                     return false;
                 }
 
-                return self::getOneFromAll(array('shorturl' => $url));
+                return static::getOneFromAll(array('shorturl' => $url));
             }
 
             /**
@@ -1052,7 +1111,7 @@
              */
             function getEditURL()
             {
-                return \Idno\Core\site()->config()->url . $this->getClassSelector() . '/edit/' . $this->getID();
+                return \Idno\Core\site()->config()->getDisplayURL() . $this->getClassSelector() . '/edit/' . $this->getID();
             }
 
             /**
@@ -1062,7 +1121,7 @@
              */
             function getDeleteURL()
             {
-                return \Idno\Core\site()->config()->url . $this->getClassSelector() . '/delete/' . $this->getID();
+                return \Idno\Core\site()->config()->getDisplayURL() . $this->getClassSelector() . '/delete/' . $this->getID();
             }
 
             /**
@@ -1107,7 +1166,7 @@
 
                 if ($this->getOwnerID() == $user_id) return true;
 
-                return \Idno\Core\site()->triggerEvent('canEdit', ['object' => $this, 'user_id' => $user_id], false);
+                return \Idno\Core\site()->triggerEvent('canEdit', array('object' => $this, 'user_id' => $user_id), false);
 
             }
 
@@ -1132,11 +1191,11 @@
 
                 if ($access instanceof \Idno\Entities\AccessGroup) {
                     if ($access->isMember($user_id)) {
-                        return \Idno\Core\site()->triggerEvent('canRead', ['object' => $this, 'user_id' => $user_id, 'access_group' => $access]);
+                        return \Idno\Core\site()->triggerEvent('canRead', array('object' => $this, 'user_id' => $user_id, 'access_group' => $access));
                     }
                 }
 
-                return \Idno\Core\site()->triggerEvent('canRead', ['object' => $this, 'user_id' => $user_id], false);
+                return \Idno\Core\site()->triggerEvent('canRead', array('object' => $this, 'user_id' => $user_id), false);
             }
 
             /**
@@ -1221,13 +1280,15 @@
             {
                 $t = \Idno\Core\site()->template();
 
-                $return = $t->__(array(
-                    'object' => $this
-                ))->draw('entity/' . $this->getClassName(), false);
+                if ($this instanceof User) {
+                    $params = ['user' => $this];
+                } else {
+                    $params = ['object' => $this];
+                }
+
+                $return = $t->__($params)->draw('entity/' . $this->getClassName(), false);
                 if ($return === false) {
-                    $return = $t->__(array(
-                        'object' => $this
-                    ))->draw('entity/default');
+                    $return = $t->__($params)->draw('entity/default');
                 }
 
                 return $return;
@@ -1277,7 +1338,11 @@
 
                 if ($attachments = $this->getAttachments()) {
                     foreach ($attachments as $attachment) {
-                        $object['attachments'][] = ['url' => $attachment['url'], 'mime-type' => $attachment['mime-type'], 'length' => $attachment['length']];
+                        $object['attachments'][] = [
+                            'url'       => preg_replace('/^(https?:\/\/\/)/', \Idno\Core\site()->config()->url, $attachment['url']),
+                            'mime-type' => $attachment['mime-type'],
+                            'length'    => $attachment['length']
+                        ];
                     }
                 }
 
@@ -1306,7 +1371,7 @@
 
                 // If a slug has been set, use it
                 if ($slug = $this->getSlug()) {
-                    return \Idno\Core\site()->config()->url . date('Y', $this->created) . '/' . $slug;
+                    return \Idno\Core\site()->config()->getDisplayURL() . date('Y', $this->created) . '/' . $slug;
                 }
 
                 $new = false;
@@ -1324,7 +1389,7 @@
                     }
                 }
 
-                return \Idno\Core\site()->config()->url . $this->getClassSelector() . '/edit';
+                return \Idno\Core\site()->config()->getDisplayURL() . $this->getClassSelector() . '/edit';
 
             }
 
@@ -1332,8 +1397,40 @@
              * Returns the URL of this object, or the URL of the contained object if this is a container.
              * @return string
              */
-            function getObjectURL() {
+            function getObjectURL()
+            {
                 return $this->getURL();
+            }
+
+            /**
+             * Wrapper for getURL
+             * @return string
+             */
+            function getDisplayURL()
+            {
+                return $this->getURL();
+            }
+
+            /**
+             * Many properties in mf2 can have either a simple string value or a complex
+             * object value, "u-in-reply-to h-cite" is a common example. This function
+             * takes a possibly mixed array, and returns an array of only strings.
+             *
+             * @return array
+             */
+            static function getStringURLs($arr)
+            {
+                $result = [];
+                foreach($arr as $value) {
+                    if (is_string($value)) {
+                        $result[] = $value;
+                    } else if (is_array($value) && !empty($value['properties']) && !empty($value['properties']['url'])) {
+                        foreach($value['properties']['url'] as $url) {
+                            $result[] = $url;
+                        }
+                    }
+                }
+                return $result;
             }
 
             /**
@@ -1355,8 +1452,21 @@
                     // At this point, we don't know who owns the page or what the content is.
                     // First, we'll initialize some variables that we're interested in filling.
 
-                    $mentions = ['owner' => [], 'mentions' => []]; // Content owner and usable webmention items
+                    $mentions = array('owner' => array(), 'mentions' => array()); // Content owner and usable webmention items
                     $return   = true; // Return value;
+
+                    // Get the page title from the source content
+                    $title = $source;
+                    try {
+                        $dom = new \DOMDocument();
+                        $dom->loadHTML($source_content['content']);
+                        $xpath = new \DOMXPath($dom);
+                        if ($xpath_title = $xpath->query('//title')->item(0)->textContent) {
+                            $title = $xpath_title;
+                        }
+                    } catch (\Exception $e) {
+                        // Do nothing
+                    }
 
                     // And then let's cycle through them!
 
@@ -1374,20 +1484,20 @@
                                             if (!empty($item['properties']['url'])) $mentions['owner']['url'] = $item['properties']['url'][0];
                                             if (!empty($item['properties']['photo'])) {
                                                 //$mentions['owner']['photo'] = $item['properties']['photo'][0];
-                                                
+
                                                 $tmpfname = tempnam(sys_get_temp_dir(), 'webmention_avatar');
                                                 file_put_contents($tmpfname, \Idno\Core\Webservice::file_get_contents($item['properties']['photo'][0]));
-                                                
+
                                                 $name = md5($item['properties']['url'][0]);
-                                                
+
                                                 // TODO: Don't update the cache image for every webmention
-                                                
+
                                                 if ($icon = \Idno\Entities\File::createThumbnailFromFile($tmpfname, $name, 300)) {
                                                     $mentions['owner']['photo'] = \Idno\Core\site()->config()->url . 'file/' . (string)$icon;
                                                 } else if ($icon = \Idno\Entities\File::createFromFile($tmpfname, $name)) {
                                                     $mentions['owner']['photo'] = \Idno\Core\site()->config()->url . 'file/' . (string)$icon;
                                                 }
-                                                
+
                                                 unlink($tmpfname);
                                             }
                                         }
@@ -1404,7 +1514,7 @@
 
                     // And now a second pass for per-item owners and mentions ...
                     foreach ($source_mf2['items'] as $item) {
-                        $mentions = $this->addWebmentionItem($item, $mentions, $source, $target);
+                        $mentions = $this->addWebmentionItem($item, $mentions, $source, $target, $title);
                         if (!empty($item['type']) && is_array($item['type'])) {
                         }
                     }
@@ -1418,6 +1528,9 @@
                         if (empty($mentions['owner']['name'])) {
                             $mentions['owner']['name'] = 'Web user';
                         }
+                        if (empty($mentions['title'])) {
+                            $mentions['title'] = '';
+                        }
                         $this->removeAnnotation($source);
                         foreach ($mentions['mentions'] as $mention) {
                             if (!empty($mention['url'])) {
@@ -1425,7 +1538,11 @@
                             } else {
                                 $permalink = $source;
                             }
-                            if (!$this->addAnnotation($mention['type'], $mentions['owner']['name'], $mentions['owner']['url'], $mentions['owner']['photo'], $mention['content'], $permalink, $mention['created'])) {
+                            // Special exemption for bridgy
+                            if ((strpos($source, 'https://brid-gy.appspot.com/') !== false) && in_array($mention['type'], array('like', 'share', 'rsvp'))) {
+                                $permalink = \Idno\Core\site()->template()->getURLWithVar('known_from', $source, implode('', $mention['url']));
+                            }
+                            if (!$this->addAnnotation($mention['type'], $mentions['owner']['name'], $mentions['owner']['url'], $mentions['owner']['photo'], $mention['content'], $permalink, $mention['created'], $mention['title'])) {
                                 $return = false;
                             }
                         }
@@ -1471,7 +1588,7 @@
              * @param $mentions
              * @return array
              */
-            function addWebmentionItem($item, $mentions, $source, $target)
+            function addWebmentionItem($item, $mentions, $source, $target, $title = '')
             {
                 if (!empty($item['properties']['author'])) {
                     foreach ($item['properties']['author'] as $author) {
@@ -1480,9 +1597,9 @@
                                 if ($type == 'h-card') {
                                     if (!empty($author['properties']['name'])) $mentions['owner']['name'] = $author['properties']['name'][0];
                                     if (!empty($author['properties']['url'])) $mentions['owner']['url'] = $author['properties']['url'][0];
-                                    if (!empty($author['properties']['photo'])) { 
+                                    if (!empty($author['properties']['photo'])) {
                                         //$mentions['owner']['photo'] = $author['properties']['photo'][0];
-                                        
+
                                         $tmpfname = tempnam(sys_get_temp_dir(), 'webmention_avatar');
                                         file_put_contents($tmpfname, \Idno\Core\Webservice::file_get_contents($author['properties']['photo'][0]));
 
@@ -1506,7 +1623,7 @@
                 if (!empty($item['type'])) {
                     if (in_array('h-entry', $item['type'])) {
 
-                        $mention = [];
+                        $mention = array();
                         if (!empty($item['properties'])) {
                             if (!empty($item['properties']['content'])) {
                                 $mention['content'] = '';
@@ -1541,20 +1658,25 @@
                                 } else {
                                     $mention['created'] = @strtotime($item['properties']['content']);
                                 }
-                                if (empty($mention['created'])) {
-                                    $mention['created'] = time();
-                                }
+                            }
+                            if (empty($mention['created'])) {
+                                $mention['created'] = time();
                             }
                             if (!empty($item['properties']['url'])) {
                                 $mention['url'] = $item['properties']['url'];
                             }
                             if (!empty($item['properties']['in-reply-to']) && is_array($item['properties']['in-reply-to'])) {
-                                if (in_array($target, $item['properties']['in-reply-to'])) {
+                                if (in_array($target, static::getStringURLs($item['properties']['in-reply-to']))) {
                                     $mention['type'] = 'reply';
                                 }
                             }
                             if (!empty($item['properties']['like']) && is_array($item['properties']['like'])) {
-                                if (in_array($target, $item['properties']['like'])) {
+                                if (in_array($target, static::getStringURLs($item['properties']['like']))) {
+                                    $mention['type'] = 'like';
+                                }
+                            }
+                            if (!empty($item['properties']['like-of']) && is_array($item['properties']['like-of'])) {
+                                if (in_array($target, static::getStringURLs($item['properties']['like-of']))) {
                                     $mention['type'] = 'like';
                                 }
                             }
@@ -1562,20 +1684,21 @@
                                 $mention['type']    = 'rsvp';
                                 $mention['content'] = implode(' ', $item['properties']['rsvp']);
                             }
-                            foreach (['share', 'repost', 'repost-of'] as $verb) {
+                            foreach (array('share', 'repost', 'repost-of') as $verb) {
                                 if (!empty($item['properties'][$verb]) && is_array($item['properties'][$verb])) {
-                                    if (in_array($target, $item['properties'][$verb])) {
+                                    if (in_array($target, static::getStringURLs($item['properties'][$verb]))) {
                                         $mention['type'] = 'share';
                                     }
                                 }
                             }
                             if (empty($mention['type'])) {
-                                $mention['type'] = 'reply';
+                                $mention['type'] = 'mention';
                             }
                         }
                         if (empty($mention['content'])) {
                             $mention['content'] = '';
                         }
+                        $mention['title'] = $title;
                         if (!empty($mention['type'])) {
                             $mentions['mentions'][] = $mention;
                         }
@@ -1585,7 +1708,7 @@
                 if (in_array('h-feed', $item['type'])) {
                     if (!empty($item['children'])) {
                         foreach ($item['children'] as $child) {
-                            $mentions = $this->addWebmentionItem($child, $mentions, $source, $target);
+                            $mentions = $this->addWebmentionItem($child, $mentions, $source, $target, $title);
                         }
                     }
                 }
@@ -1602,18 +1725,21 @@
              * @param string $content Content of the annotation
              * @param string|null $annotation_url If included, the existing URL of this annotation
              * @param int $time The UNIX timestamp associated with this annotation (if set to 0, as is default, will be current time)
+             * @param string $title The title associated with this annotation (blank by default)
              * @return bool Depending on success
              */
-            function addAnnotation($subtype, $owner_name, $owner_url, $owner_image, $content, $annotation_url = null, $time = null)
+            function addAnnotation($subtype, $owner_name, $owner_url, $owner_image, $content, $annotation_url = null, $time = null, $title = '')
             {
                 if (empty($subtype)) return false;
                 if (empty($annotation_url)) {
                     $annotation_url = $this->getURL() . '/annotations/' . md5(time() . $content); // Invent a URL for this annotation
                 }
+                $post_existed = false;
                 if ($existing_annotations = $this->getAnnotations($subtype)) {
-                    foreach($existing_annotations as $existing_local_url => $existing_annotation) {
+                    foreach ($existing_annotations as $existing_local_url => $existing_annotation) {
                         if ($existing_annotation['permalink'] == $annotation_url) {
                             $local_url = $existing_local_url;
+                            $post_existed = true;
                         }
                     }
                 }
@@ -1625,48 +1751,77 @@
                 } else {
                     $time = (int)$time;
                 }
-                $annotation  = ['permalink' => $annotation_url, 'owner_name' => $owner_name, 'owner_url' => $owner_url, 'owner_image' => $owner_image, 'content' => $content, 'time' => $time];
+                $annotation  = array('permalink' => $annotation_url, 'owner_name' => $owner_name, 'owner_url' => $owner_url, 'owner_image' => $owner_image, 'content' => $content, 'time' => $time, 'title' => $title);
                 $annotations = $this->annotations;
                 if (empty($annotations)) {
-                    $annotations = [];
+                    $annotations = array();
                 }
                 if (empty($annotations[$subtype])) {
-                    $annotations[$subtype] = [];
+                    $annotations[$subtype] = array();
                 }
 
                 $annotations[$subtype][$local_url] = $annotation;
                 $this->annotations                 = $annotations;
                 $this->save();
 
-                \Idno\Core\site()->triggerEvent('annotation/add/' . $subtype, ['annotation' => $annotation, 'object' => $this]);
+                \Idno\Core\site()->triggerEvent('annotation/add/' . $subtype, array('annotation' => $annotation, 'object' => $this));
 
-                if ($owner = $this->getOwner()) {
+                if ($owners = $this->getAnnotationOwnerUUIDs(true)) {
+                    $owners[] = $this->getOwnerID();
+                    $owners   = array_unique($owners);
+                } else {
+                    $owners = array($this->getOwnerID());
+                }
 
-                    switch ($subtype) {
-                        case 'reply':
-                            $subject               = $owner_name . ' replied to your post!';
-                            $notification_template = 'content/notification/reply';
-                            $context               = 'reply';
-                            break;
-                        case 'like':
-                            $subject               = $owner_name . ' liked your post!';
-                            $notification_template = 'content/notification/like';
-                            $context               = 'like';
-                            break;
-                        case 'share':
-                            $subject               = $owner_name . ' reshared your post!';
-                            $notification_template = 'content/notification/share';
-                            $context               = 'share';
-                            break;
-                        case 'rsvp':
-                            $subject               = $owner_name . ' RSVPed!';
-                            $notification_template = 'content/notification/rsvp';
-                            $context               = 'rsvp';
-                            break;
-                    }
+                foreach ($owners as $owner_uuid) {
+                    if ($owner = User::getByUUID($owner_uuid)) {
 
-                    if ($annotation['owner_url'] != $this->getOwner()->getURL()) {
-                        $owner->notify($subject, $notification_template, $annotation, $context, $this);
+                        $send = true;
+                        switch ($subtype) {
+                            case 'mention':
+                            case 'reply':
+                                if ($owner_uuid == $this->getOwnerID()) {
+                                    $subject = $owner_name . ' replied to your post!';
+                                } else {
+                                    $subject = $owner_name . ' replied!';
+                                }
+                                $notification_template = 'content/notification/reply';
+                                $context               = 'reply';
+                                break;
+                            case 'like':
+                                if ($owner_uuid == $this->getOwnerID()) {
+                                    $subject = $owner_name . ' liked your post!';
+                                } else {
+                                    $send = false;
+                                }
+                                $notification_template = 'content/notification/like';
+                                $context               = 'like';
+                                break;
+                            case 'share':
+                                if ($owner_uuid == $this->getOwnerID()) {
+                                    $subject = $owner_name . ' reshared your post!';
+                                } else {
+                                    $send = false;
+                                }
+                                $notification_template = 'content/notification/share';
+                                $context               = 'share';
+                                break;
+                            case 'rsvp':
+                                $subject               = $owner_name . ' RSVPed!';
+                                $notification_template = 'content/notification/rsvp';
+                                $context               = 'rsvp';
+                                break;
+                        }
+
+                        if ($annotation['owner_url'] != $this->getOwner()->getURL() && $send == true && $post_existed == false) {
+                            if (empty($subject)) {
+                                $subject = '';
+                            }
+                            if (!empty($notification_template) && !empty($context)) {
+                                $owner->notify($subject, $notification_template, $annotation, $context, $this);
+                            }
+                        }
+
                     }
                 }
 
@@ -1742,7 +1897,7 @@
                     return $this->annotations[$subtype];
                 }
 
-                return [];
+                return array();
             }
 
             /**
@@ -1758,6 +1913,31 @@
                 }
 
                 return 0;
+            }
+
+            /**
+             * Retrieves a list of UUIDs of annotation owners
+             * @param bool $local If set to true, only returns UUIDs of users who belong to this Known site
+             * @return array
+             */
+            function getAnnotationOwnerUUIDs($local = false)
+            {
+                $owners = array();
+                if (!empty($this->annotations)) {
+                    foreach ($this->annotations as $annotation_type) {
+                        if (!empty($annotation_type) && is_array($annotation_type)) {
+                            foreach ($annotation_type as $annotation) {
+                                if (!empty($annotation['owner_url'])) {
+                                    if ((parse_url($annotation['owner_url'], PHP_URL_HOST) == parse_url(\Idno\Core\site()->config()->getURL(), PHP_URL_HOST)) || !$local) {
+                                        $owners[] = $annotation['owner_url'];
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                return $owners;
             }
 
             /**
@@ -1811,4 +1991,3 @@
         }
 
     }
-	

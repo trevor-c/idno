@@ -40,6 +40,13 @@
                 } else {
                     $new = false;
                 }
+
+                if ($new) {
+                    if (!\Idno\Core\site()->triggerEvent("file/upload",[],true)) {
+                        return false;
+                    }
+                }
+
                 $this->title = \Idno\Core\site()->currentPage()->getInput('title');
                 $this->body  = \Idno\Core\site()->currentPage()->getInput('body');
                 $this->tags  = \Idno\Core\site()->currentPage()->getInput('tags');
@@ -51,17 +58,20 @@
                     }
                 }
 
-                // This is awful, but unfortunately, browsers can't be trusted to send the right mimetype.
-                $ext = pathinfo($_FILES['media']['name'], PATHINFO_EXTENSION);
-
                 // This flag will tell us if it's safe to save the object later on
-                $ok = false;
+                if ($new) {
+                    $ok = false;
+                } else {
+                    $ok = true;
+                }
 
                 // Get media
                 if ($new) {
+                    // This is awful, but unfortunately, browsers can't be trusted to send the right mimetype.
+                    $ext = pathinfo($_FILES['media']['name'], PATHINFO_EXTENSION);
                     if (!empty($ext)) {
                         if (in_array($ext,
-                            [
+                            array(
                                 'mp4',
                                 'mov',
                                 'webm',
@@ -69,7 +79,7 @@
                                 'mpeg',
                                 'mp3',
                                 'vorbis'
-                            ]
+                            )
                         )
                         ) {
                             $media_file = $_FILES['media'];
@@ -98,17 +108,18 @@
                                         break;
                                 }
                             }
+                            $this->media_type = $media_file['type'];
                             if ($media = \Idno\Entities\File::createFromFile($media_file['tmp_name'], $media_file['name'], $media_file['type'], true)) {
                                 $this->attachFile($media);
                                 $ok = true;
                             } else {
-                                \Idno\Core\site()->session()->addMessage('Media wasn\'t attached.');
+                                \Idno\Core\site()->session()->addErrorMessage('Media wasn\'t attached.');
                             }
                         } else {
-                            \Idno\Core\site()->session()->addMessage('This doesn\'t seem to be a media file .. ' . $_FILES['media']['type']);
+                            \Idno\Core\site()->session()->addErrorMessage('This doesn\'t seem to be a media file .. ' . $_FILES['media']['type']);
                         }
                     } else {
-                        \Idno\Core\site()->session()->addMessage('We couldn\'t access your media. Please try again.');
+                        \Idno\Core\site()->session()->addErrorMessage('We couldn\'t access your media. Please try again.');
 
                         return false;
                     }
@@ -119,12 +130,7 @@
                     return false;
                 }
 
-                $this->media_type = $_FILES['media']['type'];
-
-                if ($this->save()) {
-                    if ($new) {
-                        $this->addToFeed();
-                    } // Add it to the Activity Streams feed
+                if ($this->save($new)) {
                     \Idno\Core\Webmention::pingMentions($this->getURL(), \Idno\Core\site()->template()->parseURLs($this->getTitle() . ' ' . $this->getDescription()));
 
                     return true;

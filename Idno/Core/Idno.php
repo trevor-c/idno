@@ -9,6 +9,7 @@
 
     namespace Idno\Core {
 
+        use Idno\Common\Page;
         use Idno\Entities\User;
 
         class Idno extends \Idno\Common\Component
@@ -30,6 +31,7 @@
             public $currentPage;
             public $known_hub;
             public $helper_robot;
+            public $reader;
 
             function init()
             {
@@ -85,14 +87,19 @@
                         break;
                 }
                 $this->config->load();
-                $this->session      = new Session();
-                $this->actions      = new Actions();
-                $this->template     = new Template();
-                $this->syndication  = new Syndication();
-                $this->logging      = new Logging($this->config->log_level);
-                $this->plugins      = new Plugins(); // This must be loaded last
-                $this->themes       = new Themes();
+                $this->session     = new Session();
+                $this->actions     = new Actions();
+                $this->template    = new Template();
+                $this->syndication = new Syndication();
+                $this->logging     = new Logging($this->config->log_level);
+                $this->reader       = new Reader();
                 $this->helper_robot = new HelperRobot();
+
+                // No URL is a critical error, default base fallback is now a warning (Refs #526)
+                if (!$this->config->url) throw new \Exception('Known was unable to work out your base URL! You might try setting url="http://yourdomain.com/" in your config.ini');
+                if ($this->config->url == '/') \Idno\Core\site()->logging->log('Base URL has defaulted to "/" because Known was unable to detect your server name. '
+                    . 'This may be because you\'re loading Known via a script. '
+                    . 'Try setting url="http://yourdomain.com/" in your config.ini to remove this message', LOGLEVEL_WARNING);
 
                 // Connect to a Known hub if one is listed in the configuration file
                 // (and this isn't the hub!)
@@ -101,17 +108,16 @@
                 }
                 if (
                     !empty($this->config->known_hub) &&
-                    !substr_count($_SERVER['REQUEST_URI'], '.')
-                    && site()->session()->hub_connect < (time() - 10)
-                    && $this->config->known_hub != $this->config->url
+                    !substr_count($_SERVER['REQUEST_URI'], '.') &&
+                    $this->config->known_hub != $this->config->url
                 ) {
                     site()->session()->hub_connect = time();
-                    \Idno\Core\site()->logging->log('Connecting to ' . $this->config->known_hub);
                     \Idno\Core\site()->known_hub = new \Idno\Core\Hub($this->config->known_hub);
                     \Idno\Core\site()->known_hub->connect();
                 }
 
                 User::registerEvents();
+                site()->session()->refreshCurrentSessionuser();
             }
 
             /**
@@ -143,8 +149,13 @@
                 $this->addPageHandler('/share/?', '\Idno\Pages\Entity\Share');
                 $this->addPageHandler('/bookmarklet\.js', '\Idno\Pages\Entity\Bookmarklet', true);
 
+                /** Mobile integrations */
+                $this->addPageHandler('/chrome/manifest\.json', '\Idno\Pages\Chrome\Manifest', true);
+
                 /** Files */
                 $this->addPageHandler('/file/upload/?', '\Idno\Pages\File\Upload', true);
+                $this->addPageHandler('/file/picker/?', '\Idno\Pages\File\Picker', true);
+                $this->addPageHandler('/filepicker/?', '\Idno\Pages\File\Picker', true);
                 $this->addPageHandler('/file/([A-Za-z0-9]+)(/.*)?', '\Idno\Pages\File\View', true);
 
                 /** Users */
@@ -154,10 +165,10 @@
                 /** Search */
                 $this->addPageHandler('/search/?', '\Idno\Pages\Search\Forward');
                 $this->addPageHandler('/search/mentions\.json', '\Idno\Pages\Search\Mentions');
+                $this->addPageHandler('/tag/([\w0-9]+)\/?', '\Idno\Pages\Search\Tags');
 
-                /** robots.txt / humans.txt */
+                /** robots.txt */
                 $this->addPageHandler('/robots\.txt', '\Idno\Pages\Txt\Robots');
-                $this->addPageHandler('/humans\.txt', '\Idno\Pages\Txt\Humans');
 
                 /** Autosave / preview */
                 $this->addPageHandler('/autosave/?', '\Idno\Pages\Entity\Autosave');
@@ -169,6 +180,9 @@
                 $this->addPageHandler('/begin/connect/?', '\Idno\Pages\Onboarding\Connect');
                 $this->addPageHandler('/begin/connect\-forwarder/?', '\Idno\Pages\Onboarding\ConnectForwarder');
                 $this->addPageHandler('/begin/publish/?', '\Idno\Pages\Onboarding\Publish');
+
+                $this->themes  = new Themes();
+                $this->plugins = new Plugins(); // This must be loaded last
 
             }
 
@@ -211,6 +225,15 @@
             }
 
             /**
+             * Returns the current logging interface
+             * @return \Idno\Core\Logging
+             */
+            function &logging()
+            {
+                return $this->logging;
+            }
+
+            /**
              * Shortcut to trigger an event: supply the event name and
              * (optionally) an array of data, and get a variable back.
              *
@@ -224,7 +247,7 @@
             {
                 $event = new Event($data);
                 $event->setResponse($default);
-                $this->events()->dispatch($eventName, $event);
+                $event = $this->events()->dispatch($eventName, $event);
                 if (!$event->forward()) {
                     return $event->response();
                 } else {
@@ -306,6 +329,15 @@
             }
 
             /**
+             * Return the reader associated with this site
+             * @return \Idno\Core\Reader
+             */
+            function &reader()
+            {
+                return $this->reader;
+            }
+
+            /**
              * Tells the system that callable $listener wants to be notified when
              * event $event is triggered. $priority is an optional integer
              * that specifies order priority; the higher the number, the earlier
@@ -318,13 +350,8 @@
 
             function addEventHook($event, $listener, $priority = 0)
             {
-                static $listened = [];
                 if (is_callable($listener)) {
-                    $listen_index = json_encode($listener);
-                    if (empty($listened[$event][$listen_index])) {
-                        $this->dispatcher->addListener($event, $listener, $priority);
-                        $listened[$event][$listen_index] = true;
-                    }
+                    $this->dispatcher->addListener($event, $listener, $priority);
                 }
             }
 
@@ -360,9 +387,9 @@
                 if (class_exists($handler)) {
                     unset($this->pagehandlers[$pattern]);
                     unset($this->public_pages[$pattern]);
-                    $this->pagehandlers = [$pattern => $handler] + $this->pagehandlers;
+                    $this->pagehandlers = array($pattern => $handler) + $this->pagehandlers;
                     if ($public == true) {
-                        $this->public_pages = [$pattern => $handler] + $this->public_pages;
+                        $this->public_pages = array($pattern => $handler) + $this->public_pages;
                     }
                 }
             }
@@ -388,7 +415,7 @@
                     return $this->public_pages;
                 }
 
-                return [];
+                return array();
             }
 
             /**
@@ -435,7 +462,7 @@
                     ':alpha'  => '([a-zA-Z0-9-_]+)'
                 );
                 $discovered_handler = false;
-                $matches            = [];
+                $matches            = array();
                 foreach ($this->pagehandlers as $pattern => $handler_name) {
                     $pattern = strtr($pattern, $tokens);
                     if (preg_match('#^/?' . $pattern . '/?$#', $path_info, $matches)) {
@@ -472,9 +499,20 @@
              */
             function currentPage()
             {
-                if (!empty($this->currentPage)) return $this->currentPage;
+                if (!empty($this->currentPage)) {
+                    return $this->currentPage;
+                }
 
-                return false;
+                return new Page();
+            }
+
+            /**
+             * Retrieves admins for this site
+             * @return array
+             */
+            function getAdmins()
+            {
+                return User::get(['admin' => true],[],9999);
             }
 
             /**
@@ -483,7 +521,7 @@
              */
             function version()
             {
-                return '0.6';
+                return '0.7.5';
             }
 
             /**
@@ -577,6 +615,42 @@
             }
 
             /**
+             * Retrieve site icons.
+             * Retrieve a set of one or more icon for the current site, allowing plugins and other components
+             * access icons for displaying in various contexts
+             *
+             * @returns array An associative array of various icons => url
+             */
+            function getSiteIcons()
+            {
+                $icons = [];
+
+                // Set our defaults (TODO: Set these cleaner, perhaps through the template system)
+                $icons['defaults'] = [
+                    'default'     => \Idno\Core\site()->config()->getDisplayURL() . 'gfx/logos/logo_k.png',
+                    'default_16'  => \Idno\Core\site()->config()->getDisplayURL() . 'gfx/logos/logo_k_16.png',
+                    'default_32'  => \Idno\Core\site()->config()->getDisplayURL() . 'gfx/logos/logo_k_32.png',
+                    'default_64'  => \Idno\Core\site()->config()->getDisplayURL() . 'gfx/logos/logo_k_64.png',
+
+                    // Apple logos
+                    'default_57'  => \Idno\Core\site()->config()->getDisplayURL() . 'gfx/logos/apple-icon-57x57.png',
+                    'default_72'  => \Idno\Core\site()->config()->getDisplayURL() . 'gfx/logos/apple-icon-72x72.png',
+                    'default_114' => \Idno\Core\site()->config()->getDisplayURL() . 'gfx/logos/apple-icon-114x114.png',
+                    'default_144' => \Idno\Core\site()->config()->getDisplayURL() . 'gfx/logos/apple-icon-144x144.png',
+                ];
+
+                // If we're on a page, see if that has a specific icon
+                if ($page = \Idno\Core\site()->currentPage()) {
+                    if ($page_icons = $page->getIcon()) {
+                        $icons['page'] = $page_icons;
+                    }
+                }
+
+                // Now, return a list of icons, but pass it through an event hook to override
+                return $this->triggerEvent('site/icons', ['object' => $this], $icons);
+            }
+
+            /**
              * Retrieve notices (eg notifications that a new version has been released) from Known HQ
              * @return mixed
              */
@@ -587,13 +661,13 @@
                     return '';
                 }
                 $web_client = new Webservice();
-                $results    = $web_client->post('http://withknown.com/vendor-services/messages/', [
+                $results    = $web_client->post('https://withknown.com/vendor-services/messages/', array(
                     'url'     => site()->config()->getURL(),
                     'title'   => site()->config()->getTitle(),
                     'version' => site()->getVersion(),
                     'public'  => site()->config()->isPublicSite(),
                     'hub'     => site()->config()->known_hub
-                ]);
+                ));
                 if ($results['response'] == 200) {
                     return $results['content'];
                 }
@@ -608,6 +682,7 @@
             {
                 if (site()->currentPage()->getInput('unembed')) {
                     $_SESSION['embedded'] = false;
+
                     return false;
                 }
                 if (!empty($_SESSION['embedded'])) {
@@ -615,9 +690,23 @@
                 }
                 if (site()->currentPage()->getInput('embedded')) {
                     $_SESSION['embedded'] = true;
+
                     return true;
                 }
+
                 return false;
+            }
+
+            /**
+             * Detects if this site is being accessed securely or not
+             * @return bool
+             */
+            function isSecure()
+            {
+                return
+                    (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+                    || $_SERVER['SERVER_PORT'] == 443
+                    || (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] == 'https');
             }
 
         }

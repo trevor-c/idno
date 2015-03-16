@@ -18,13 +18,13 @@
 
     <div class="span10 offset1">
 
-        <form action="<?=\Idno\Core\site()->config()->url?>account/password" method="post" class="form-horizontal">
+        <form action="<?=\Idno\Core\site()->config()->getDisplayURL()?>account/password" method="post" class="form-horizontal">
 
             <div class="control-group">
                 <label class="control-label" for="inputUsername">Your email address<br />
                     <small>The address associated with your <?=\Idno\Core\site()->config()->title?> account.</small></label>
                 <div class="controls">
-                    <input type="email" id="inputName" placeholder="Email" class="span4" name="email" value="" required>
+                    <input type="email" id="inputName" placeholder="Email" class="" name="email" value="" required>
                 </div>
             </div>
             <div class="control-group">

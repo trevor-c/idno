@@ -15,7 +15,7 @@
             function getContent()
             {
                 $t = \Idno\Core\site()->template();
-                $t->__(['title' => 'Webmention endpoint', 'body' => $t->draw('pages/webmention')])->drawPage();
+                $t->__(array('title' => 'Webmention endpoint', 'body' => $t->draw('pages/webmention')))->drawPage();
             }
 
             function post()
@@ -71,7 +71,7 @@
                                 }
                             } else {
                                 $error      = 'source_not_found';
-                                $error_text = 'The source content could not be obtained.';
+                                $error_text = 'The source content for '.$source.' could not be obtained.';
                                 \Idno\Core\site()->logging->log('No content from ' . $source, LOGLEVEL_ERROR);
                             }
                         } else {
@@ -80,11 +80,12 @@
                         }
                     } else {
                         $error      = 'target_not_found';
-                        $error_text = 'The target page does not exist.';
+                        $error_text = 'The target page '.$target.' does not exist.';
+                        \Idno\Core\site()->logging()->log('Could not find handler for ' . $target, LOGLEVEL_ERROR);
                     }
                 }
                 $this->setResponse(400); // Webmention failed.
-                echo json_encode(['error' => $error, 'error_text' => $error_text]);
+                echo json_encode(array('error' => $error, 'error_text' => $error_text));
             }
 
         }

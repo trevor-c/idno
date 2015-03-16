@@ -3,7 +3,7 @@
 
         <div class="offset1 span10">
             <h1 class="p-name">
-                Gone, baby, gone.
+                This content has been removed
             </h1>
         </div>
     </div>
@@ -12,7 +12,7 @@
             <p class="p-summary">This resource isn't here anymore.</p>
             <p>
                 Cool links never die, but sometimes things don't work out.
-                <a href="<?=\Idno\Core\site()->config()->url?>">Click here to head back to the <?=\Idno\Core\site()->config()->title?> homepage</a>.
+                <a href="<?=\Idno\Core\site()->config()->getDisplayURL()?>">Click here to head back to the <?=\Idno\Core\site()->config()->title?> homepage</a>.
             </p>
         </div>
     </div>

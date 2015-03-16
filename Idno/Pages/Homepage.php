@@ -20,7 +20,7 @@
                 $query          = $this->getInput('q');
                 $offset         = (int)$this->getInput('offset');
                 $types          = $this->getInput('types');
-                $friendly_types = [];
+                $friendly_types = array();
 
                 // Check for an empty site
                 if (!\Idno\Entities\User::get()) {
@@ -31,9 +31,9 @@
                     if ($friendly_types = explode('/', $this->arguments[0])) {
                         $friendly_types = array_filter($friendly_types);
                         if (empty($friendly_types) && !empty($query)) {
-                            $friendly_types = [all];
+                            $friendly_types = array('all');
                         }
-                        $types = [];
+                        $types = array();
                         // Run through the URL parameters and set content types appropriately
                         foreach ($friendly_types as $friendly_type) {
                             if ($friendly_type == 'all') {
@@ -48,13 +48,11 @@
                 } else {
                     // If user has content-specific preferences, do something with $friendly_types
                     if (empty($query)) {
-                        if ($user = $this->getOwner()) {
-                            $types = $user->getDefaultContentTypes();
-                        }
+                        $types = \Idno\Core\site()->config()->getHomepageContentTypes();
                     }
                 }
 
-                $search = [];
+                $search = array();
 
                 if (!empty($query)) {
                     $search = \Idno\Core\site()->db()->createSearchArray($query);
@@ -64,12 +62,12 @@
                     $types          = 'Idno\Entities\ActivityStreamPost';
                     $search['verb'] = 'post';
                 } else {
-                    if (!is_array($types)) $types = [$types];
+                    if (!is_array($types)) $types = array($types);
                     $types[] = '!Idno\Entities\ActivityStreamPost';
                 }
 
-                $count = \Idno\Entities\ActivityStreamPost::countFromX($types, []);
-                $feed  = \Idno\Entities\ActivityStreamPost::getFromX($types, $search, [], \Idno\Core\site()->config()->items_per_page, $offset);
+                $count = \Idno\Entities\ActivityStreamPost::countFromX($types, array());
+                $feed  = \Idno\Entities\ActivityStreamPost::getFromX($types, $search, array(), \Idno\Core\site()->config()->items_per_page, $offset);
                 if (\Idno\Core\site()->session()->isLoggedIn()) {
                     $create = \Idno\Common\ContentType::getRegistered();
                 } else {
@@ -83,8 +81,11 @@
                 }
 
                 // If we have a feed, set our last modified flag to the time of the latest returned entry
-                if ($feed && is_array($feed)) {
-                    $this->setLastModifiedHeader($feed[0]->updated);
+                if (!empty($feed)) {
+                    if (is_array($feed)) {
+                        $feed = array_filter($feed);
+                        $this->setLastModifiedHeader(reset($feed)->updated);
+                    }
                 }
 
                 $t = \Idno\Core\site()->template();

@@ -41,7 +41,7 @@
                         
                         // Check whether the intent is valid
                         if (is_array($pending->$hub_mode) && in_array($subscription->getUUID(), $pending->$hub_mode)) {
-                            $new = [];
+                            $new = array();
                             foreach ($pending->$hub_mode as $value)
                                 $new[] = $value;
                             
@@ -81,11 +81,11 @@
                 
                 \Idno\Core\site()->logging->log("Pubsub: Ping received, pinging out...", LOGLEVEL_DEBUG);
                 
-                \Idno\Core\site()->triggerEvent('pubsubhubbub/ping', [
+                \Idno\Core\site()->triggerEvent('pubsubhubbub/ping', array(
                     'subscriber' => $subscriber,
                     'subscription' => $subscription,
                     'data' => trim(file_get_contents("php://input"))
-                ]);
+                ));
                 
             }
 

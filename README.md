@@ -1,10 +1,22 @@
-Known
+Known [![Build Status](https://travis-ci.org/idno/Known.svg?branch=master)](https://travis-ci.org/idno/Known)
 =====
 Known is a publishing platform for everyone.
 
-Learn more and sign up to get updates: <http://withknown.com>
+Learn more and sign up to get updates: <https://withknown.com>
 
-Known is under active development and an installable package is not yet available. It requires PHP 5.4+ with the MongoDB extension, Apache Web Server with the mod_rewrite extension, and MongoDB.
+Join the development mailing list: <https://groups.google.com/forum/#!forum/known-dev>
+
+Known is under active development. Installable packages are available from <https://withknown.com>.
+Known requires PHP 5.4+ with selected extensions. More info: <http://docs.withknown.com/>
+
+If you are installing Known for use on your website, we HIGHLY recommend using the installable packages
+from <https://withknown.com/>. Installation will be much easier.
+
+If you are checking out from the git repository, you should read the full documentation: <http://docs.withknown.com/>
+
+Installation
+------------
+See installation instructions: http://docs.withknown.com/en/latest/install/index.html
 
 Copyright
 ---------
@@ -38,6 +50,7 @@ Known also contains
 * ToroPHP, which is distributed under the MIT License. Source: https://github.com/anandkunal/ToroPHP/
 * Anthony Ferrara's PHP 5.5 password API shim, which is distributed under the MIT license. Source: https://github.com/ircmaxell/password_compat
 * Font Awesome, which is distributed under the Open Font License, version 1.1: http://fortawesome.github.io/Font-Awesome/
+* Fontello, for generating open source webfont. Source: https://github.com/fontello/fontello
 * Steve Clay's AutoP, which is distributed under the MIT License. Source: https://code.google.com/p/mrclay/
 * Aaron Parecki's Webmention Client, which is distributed under the Apache 2.0 license. Source: https://github.com/aaronpk/mention-client
 * Barnaby Walters's Microformats 2 Parser, which is distributed under the MIT License. Source: https://github.com/indieweb/php-mf2
@@ -51,3 +64,7 @@ Known also contains
 * Antwort, an email template which is distributed under the MIT License. Source: https://github.com/internations/antwort
 * Mention.js, a Bootstrap user at-mention library, which is distributed under the MIT License. Source: https://github.com/jakiestfu/Mention.js
 * MediaElement.js, a cross-browser media player, which is distributed under the MIT License. Source: https://github.com/johndyer/mediaelement
+* Simplepie, a feed parser, which is distributed under the BSD license. Source: https://github.com/simplepie/simplepie/
+* Bootstrap Toggle, which is distributed under the MIT License. Source: http://www.bootstraptoggle.com/
+* TinyMCE, a rich text editor, which is distributed under the AGPL License. Source: https://github.com/tinymce/tinymce
+* Highlight.js, a library for source code syntax highlighting, which is distributed under the BSD license. Source: https://github.com/isagalaev/highlight.js

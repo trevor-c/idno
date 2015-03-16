@@ -72,17 +72,13 @@
                     $this->rsvp = $rsvp;
                     $this->inreplyto = \Idno\Core\site()->currentPage()->getInput('inreplyto');
                     $this->setAccess('PUBLIC');
-                    if ($this->save()) {
-                        if ($new) {
-                            // Add it to the Activity Streams feed
-                            $this->addToFeed();
-                        }
+                    if ($this->save($new)) {
                         \Idno\Core\Webmention::pingMentions($this->getURL(), \Idno\Core\site()->template()->parseURLs($this->getDescription()));
                         \Idno\Core\site()->session()->addMessage('Your RSVP was successfully saved.');
                         return true;
                     }
                 } else {
-                    \Idno\Core\site()->session()->addMessage('You can\'t save an RSVP with no status.');
+                    \Idno\Core\site()->session()->addErrorMessage('You can\'t save an RSVP with no status.');
                 }
                 return false;
 

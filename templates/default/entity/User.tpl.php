@@ -1,3 +1,10 @@
+<?php
+
+    if (empty($vars['user']) && !empty($vars['object'])) {
+        $vars['user'] = $vars['object'];
+    }
+
+?>
 <div class="row profile h-card">
     <div class="span8 offset2">
         <div class="row visible-phone">
@@ -14,7 +21,7 @@
         <div class="row">
             <div class="span2 namebadge">
                 <p>
-                    <a href="<?= $vars['user']->getURL() ?>" class="u-url icon-container"><img class="u-photo"
+                    <a href="<?= $vars['user']->getDisplayURL() ?>" class="u-url icon-container"><img class="u-photo"
                                                                                                src="<?= $vars['user']->getIcon() ?>"/></a>
                 </p>
             </div>
@@ -22,14 +29,14 @@
                 <div class="row">
                     <div class="span5">
                         <h1 class="p-profile">
-                            <a href="<?= $vars['user']->getURL() ?>"
-                               class="u-url p-name fn"><?= $vars['user']->getTitle() ?></a>
+                            <a href="<?= $vars['user']->getDisplayURL() ?>"
+                               class="u-url p-name fn"><?= htmlentities(strip_tags($vars['user']->getTitle()), ENT_QUOTES, 'UTF-8') ?></a>
                         </h1>
                     </div>
                     <div class="span1">
                         <?php
 
-                            if ($vars['user']->canEdit()) {
+                            if ($vars['user']->canEdit() && $vars['user']->getUUID() == \Idno\Core\site()->session()->currentUserUUID()) {
                                 // If you're wondering, this is wrapped in an h1 tag to keep it aligned with
                                 // the user's name over in the next div. TODO: find a better way to do this
                                 // that retains visual consistency.
@@ -53,7 +60,7 @@
                                     <p class="highlightedText">
                                         A profile helps you describe yourself to other people on the site
                                         and on the web. You haven't described yourself yet.
-                                        <a href="<?= $vars['user']->getURL() ?>/edit/">Click here to fill in your
+                                        <a href="<?= $vars['user']->getDisplayURL() ?>/edit/">Click here to fill in your
                                             profile information.</a>
                                     </p>
                                 <?php

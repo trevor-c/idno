@@ -50,7 +50,7 @@
                         $email = new Email();
                         $email->setSubject("Password reset");
                         $email->addTo($user->email);
-                        $email->setHTMLBody($t->__(['email' => $email_address, 'code' => $auth_code])->draw('account/password'));
+                        $email->setHTMLBody($t->__(array('email' => $email_address, 'code' => $auth_code))->draw('account/password'));
                         $email->send();
 
                         $this->forward(\Idno\Core\site()->config()->getURL() . 'account/password/?sent=true');
@@ -58,7 +58,7 @@
                     }
 
                 }
-                \Idno\Core\site()->session()->addMessage("Oh no! We couldn't find an account associated with that email address.");
+                \Idno\Core\site()->session()->addErrorMessage("Oh no! We couldn't find an account associated with that email address.");
                 $this->forward(\Idno\Core\site()->config()->getURL() . 'account/password');
 
             }
