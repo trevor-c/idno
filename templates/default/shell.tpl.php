@@ -9,10 +9,13 @@
         $vars['title'] = implode(' ', array_slice(explode(' ', strip_tags($vars['description'])), 0, 10));
     }
 
+    // Use appropriate language
+    $lang = 'en';
+    if (!empty(\Idno\Core\site()->config()->lang))
+        $lang = \Idno\Core\site()->config()->lang;
 ?>
-<?php if (!$_SERVER["HTTP_X_PJAX"]): ?>
-    <!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html>
+<html lang="<?= $lang; ?>">
 <head>
     <meta charset="utf-8">
     <title><?= htmlspecialchars($vars['title']); ?></title>
@@ -20,6 +23,7 @@
     <meta name="viewport" content="initial-scale=1.0" media="(device-height: 568px)"/>
     <meta name="description" content="<?= htmlspecialchars(strip_tags($vars['description'])) ?>">
     <meta name="generator" content="Known https://withknown.com">
+    <meta http-equiv="Content-Language" content="<?= $lang; ?>">
 
     <?= $this->draw('shell/icons'); ?>
     <?= $this->draw('shell/favicon'); ?>
@@ -29,20 +33,26 @@
         if (\Idno\Core\site()->session()->isLoggedIn()) {
 
             ?>
-            <link rel="manifest" href="<?=\Idno\Core\site()->config()->getDisplayURL()?>chrome/manifest.json">
-            <script>
-                window.addEventListener('load', function() {
-                    navigator.serviceWorker.register('<?=\Idno\Core\site()->config()->getDisplayURL()?>chrome/service-worker.js', { scope: '/' })
-                        .then(function(r) {
-                            console.log('Registered service worker');
-                        })
-                        .catch(function(whut) {
-                            console.error('Could not register service worker');
-                            console.error(whut);
-                        });
-                });
-            </script>
+            <!-- <link rel="manifest" href="<?= \Idno\Core\site()->config()->getDisplayURL() ?>chrome/manifest.json"> -->
         <?php
+            if (Idno\Core\site()->isSecure()) {
+        ?>
+            <!-- <script>
+                window.addEventListener('load', function () {
+                    if ('serviceWorker' in navigator) {
+                        navigator.serviceWorker.register('<?=\Idno\Core\site()->config()->getDisplayURL()?>chrome/service-worker.js', {scope: '/'})
+                            .then(function (r) {
+                                console.log('Registered service worker');
+                            })
+                            .catch(function (whut) {
+                                console.error('Could not register service worker');
+                                console.error(whut);
+                            });
+                    }
+                });
+            </script> -->
+        <?php
+        }
 
         }
 
@@ -117,22 +127,31 @@
 
     ?>
 
+    <!-- We need jQuery at the top of the page -->
+    <script src="<?= \Idno\Core\site()->config()->getDisplayURL() . 'external/jquery/' ?>jquery.min.js"></script>
+
     <!-- Le styles -->
-    <link href="<?= \Idno\Core\site()->config()->getDisplayURL() . 'external/bootstrap/' ?>assets/css/bootstrap.css"
-          rel="stylesheet">
+    <link href="<?= \Idno\Core\site()->config()->getStaticURL() . 'external/bootstrap/' ?>assets/css/bootstrap.min.css"
+          rel="stylesheet" />
+    <link href="<?= \Idno\Core\site()->config()->getStaticURL() . 'external/bootstrap/' ?>assets/css/bootstrap-theme.min.css" />
+    <script src="<?= \Idno\Core\site()->config()->getStaticURL() . 'external/bootstrap/' ?>assets/js/bootstrap.min.js"></script>
+
+    <!-- Accessibility -->
+    <link rel="stylesheet" href="<?= \Idno\Core\site()->config()->getStaticURL() . 'external/paypal-bootstrap-accessibility-plugin/' ?>plugins/css/bootstrap-accessibility_1.0.3.css">
+    <script  src="<?= \Idno\Core\site()->config()->getStaticURL() . 'external/paypal-bootstrap-accessibility-plugin/' ?>plugins/js/bootstrap-accessibility_1.0.3.min.js"></script>
+
+    <!-- Fonts -->
     <link rel="stylesheet"
-          href="<?= \Idno\Core\site()->config()->getDisplayURL() ?>external/fontello/css/known-fontello.css">
+          href="<?= \Idno\Core\site()->config()->getStaticURL() ?>external/font-awesome/css/font-awesome.css">
     <!--<link rel="stylesheet"
-          href="<?= \Idno\Core\site()->config()->getDisplayURL() ?>external/font-awesome/css/font-awesome.min.css">-->
+          href="<?= \Idno\Core\site()->config()->getStaticURL() ?>external/font-awesome/css/font-awesome.min.css">-->
     <style>
         body {
             padding-top: 100px; /* 60px to make the container go all the way to the bottom of the topbar */
         }
     </style>
-    <link
-        href="<?= \Idno\Core\site()->config()->getDisplayURL() . 'external/bootstrap/' ?>assets/css/bootstrap-responsive.css"
-        rel="stylesheet">
-    <link href="<?= \Idno\Core\site()->config()->getDisplayURL() ?>css/default.css?20150123" rel="stylesheet">
+    
+    <?=$this->draw('shell/css');?>
 
     <!-- HTML5 shim, for IE6-8 support of HTML5 elements -->
     <!--[if lt IE 9]>
@@ -140,11 +159,8 @@
         src="<?= \Idno\Core\site()->config()->getDisplayURL() . 'external/bootstrap/' ?>assets/js/html5shiv.js"></script>
     <![endif]-->
 
-    <!-- We need jQuery at the top of the page -->
-    <script src="<?= \Idno\Core\site()->config()->getDisplayURL() . 'external/jquery/' ?>jquery.min.js"></script>
-
     <!-- Default Known JavaScript -->
-    <script src="<?= \Idno\Core\site()->config()->getDisplayURL() . 'js/default.js' ?>"></script>
+    <script src="<?= \Idno\Core\site()->config()->getStaticURL() . 'js/default.js?20150406' ?>"></script>
 
     <!-- To silo is human, to syndicate divine -->
     <link rel="alternate" type="application/rss+xml" title="<?= htmlspecialchars($vars['title']) ?>"
@@ -158,8 +174,8 @@
           href="<?= \Idno\Core\site()->config()->getDisplayURL() ?>content/all"/>
 
     <!-- Webmention endpoint -->
-    <link href="<?= \Idno\Core\site()->config()->getDisplayURL() ?>webmention/" rel="http://webmention.org/"/>
-    <link href="<?= \Idno\Core\site()->config()->getDisplayURL() ?>webmention/" rel="webmention"/>
+    <link href="<?= \Idno\Core\site()->config()->getURL() ?>webmention/" rel="http://webmention.org/"/>
+    <link href="<?= \Idno\Core\site()->config()->getURL() ?>webmention/" rel="webmention"/>
 
     <?php $this->draw('shell/identities') ?>
     <?php if (!empty(\Idno\Core\site()->config()->hub)) { ?>
@@ -178,16 +194,14 @@
         }
     ?>
 
-   <script src="<?= \Idno\Core\site()->config()->getDisplayURL() ?>external/fragmention/fragmention.js"></script>
+    <script src="<?= \Idno\Core\site()->config()->getStaticURL() ?>external/fragmention/fragmention.js"></script>
 
     <!-- Syndication -->
-    <link href="<?=\Idno\Core\site()->config()->getDisplayURL()?>external/bootstrap-toggle/css/bootstrap2-toggle.min.css" rel="stylesheet" />
-    <script src="<?=\Idno\Core\site()->config()->getDisplayURL()?>external/bootstrap-toggle/js/bootstrap2-toggle.js"></script>
-
-    <!-- Syntax highlighting -->
-    <link href="<?=\Idno\Core\site()->config()->getDisplayURL()?>external/highlight/styles/default.css" rel="stylesheet">
-    <script src="<?=\Idno\Core\site()->config()->getDisplayURL()?>external/highlight/highlight.pack.js"></script>
-    <script>hljs.initHighlightingOnLoad();</script>
+    <link
+        href="<?= \Idno\Core\site()->config()->getStaticURL() ?>external/bootstrap-toggle/css/bootstrap-toggle.min.css"
+        rel="stylesheet"/>
+    <script
+        src="<?= \Idno\Core\site()->config()->getStaticURL() ?>external/bootstrap-toggle/js/bootstrap-toggle.js"></script>
 
     <?= $this->draw('shell/head', $vars); ?>
 
@@ -210,9 +224,13 @@
             }
         }
     }
+    if (\Idno\Core\site()->session()->isLoggedIn()) {
+        echo ' logged-in';
+    } else {
+        echo ' logged-out';
+    }
 
 ?>">
-<?php endif; ?>
 <div id="pjax-container" class="page-container">
     <?php
         $currentPage = \Idno\Core\site()->currentPage();
@@ -221,53 +239,9 @@
             $hidenav = \Idno\Core\site()->embedded(); //\Idno\Core\site()->currentPage()->getInput('hidenav');
         }
         if (empty($vars['hidenav']) && empty($hidenav)) {
-            ?>
-            <div class="navbar navbar-inverse navbar-fixed-top">
-                <div class="navbar-inner">
-                    <div class="container">
-                        <button type="button" class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
-                            <span class="icon-bar"></span>
-                            <span class="icon-bar"></span>
-                            <span class="icon-bar"></span>
-                        </button>
-                        <a class="brand"
-                           href="<?= \Idno\Core\site()->config()->getDisplayURL() ?>"><?=
-                                // \Idno\Core\site()->config()->title
-                                $this->draw('shell/toolbar/title')
-                            ?></a>
 
-                        <div class="nav-collapse collapse">
-                            <?php
-                                if (\Idno\Core\site()->config()->isPublicSite() || \Idno\Core\site()->session()->isLoggedOn()) {
-                                    echo $this->draw('shell/toolbar/search');
+            echo $this->draw('shell/toolbar/main');
 
-                                    echo $this->draw('shell/toolbar/content');
-                                }
-                            ?>
-                            <ul class="nav pull-right" role="menu">
-                                <?php
-
-                                    echo $this->draw('shell/toolbar/links');
-
-                                    if (\Idno\Core\site()->session()->isLoggedIn()) {
-
-                                        echo $this->draw('shell/toolbar/logged-in');
-
-                                    } else {
-
-                                        echo $this->draw('shell/toolbar/logged-out');
-
-                                    }
-
-                                ?>
-                            </ul>
-                        </div>
-                        <!--/.nav-collapse -->
-                    </div>
-                </div>
-            </div>
-
-        <?php
         } else {
 
             ?>
@@ -278,7 +252,7 @@
     ?>
 
     <div class="container page-body">
-
+        <a name="pagecontent"></a>
         <?php
 
             if (!empty($messages)) {
@@ -286,7 +260,7 @@
 
                     ?>
 
-                    <div class="alert <?= $message['message_type'] ?>">
+                    <div class="alert <?= $message['message_type'] ?> col-md-10 col-md-offset-1">
                         <button type="button" class="close" data-dismiss="alert">&times;</button>
                         <?= $message['message'] ?>
                     </div>
@@ -315,8 +289,6 @@
 <script
     src="<?= \Idno\Core\site()->config()->getDisplayURL() . 'external/jquery-timeago/' ?>jquery.timeago.js"></script>
 <script src="<?= \Idno\Core\site()->config()->getDisplayURL() . 'external/jquery-pjax/' ?>jquery.pjax.js"></script>
-<script
-    src="<?= \Idno\Core\site()->config()->getDisplayURL() . 'external/bootstrap/' ?>assets/js/bootstrap.min.js"></script>
 <script src="<?= \Idno\Core\site()->config()->getDisplayURL() . 'external/underscore/underscore-min.js' ?>"
         type="text/javascript"></script>
 <script src="<?= \Idno\Core\site()->config()->getDisplayURL() . 'external/mention/bootstrap-typeahead.js' ?>"
@@ -324,8 +296,7 @@
 <script src="<?= \Idno\Core\site()->config()->getDisplayURL() . 'external/mention/mention.js' ?>"
         type="text/javascript"></script>
 
-        
-        
+
 <!-- Flexible media player -->
 <script
     src="<?= \Idno\Core\site()->config()->getDisplayURL() ?>external/mediaelement/build/mediaelement-and-player.min.js"></script>
@@ -396,6 +367,53 @@
     });
 
     /**
+     * Handle Twitter tweet embedding
+     */
+    $(document).ready(function () {
+        $('div.twitter-embed').each(function (index) {
+            var url = $(this).attr('data-url');
+            var div = $(this);
+
+            $.ajax({
+                url: "https://api.twitter.com/1/statuses/oembed.json?url=" + url,
+                dataType: "jsonp",
+                success: function (data) {
+                    div.html(data['html']);
+                }
+            });
+        });
+
+        $('body').on('click', function (event, el) {
+            var clickTarget = event.target;
+
+            if (clickTarget.href && clickTarget.href.indexOf(window.location.origin) === -1) {
+                clickTarget.target = "_blank";
+            }
+        });
+    });
+    
+    /**
+     * Handle Soundcloud oEmbed code
+     */
+    $(document).ready(function() {
+	$('div.soundcloud-embed').each(function(index) {
+	    var url = $(this).attr('data-url');
+	    var div = $(this);
+	    
+	    $.getJSON('https://soundcloud.com/oembed?callback=?',
+		    {
+			format: 'js',
+			url: url,
+			iframe: true
+		    },
+		function(data) {
+		    div.html(data['html']);
+		}
+	    );
+	});
+    });
+
+    /**
      * Better handle links in iOS web applications.
      * This code (from the discussion here: https://gist.github.com/kylebarrow/1042026)
      * will prevent internal links being opened up in safari when known is installed
@@ -422,5 +440,7 @@
 <?= $this->draw('shell/footer', $vars) ?>
 
 </body>
+
+
 </html>
 <?php endif; ?>

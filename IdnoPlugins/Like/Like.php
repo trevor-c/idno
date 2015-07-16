@@ -36,6 +36,14 @@
             }
 
             /**
+             * Returns a URL for syndication
+             * @return mixed
+             */
+            function getSyndicationURL() {
+                return $this->body;
+            }
+
+            /**
              * Like objects have type 'bookmark'
              * @return 'bookmark'
              */
@@ -51,8 +59,8 @@
             function getTitleFromURL($Url){
                 $str = \Idno\Core\Webservice::file_get_contents($Url);
                 if(strlen($str) > 0){
-                    preg_match("/\<title\>(.*)\<\/title\>/siU",$str,$title);
-                    return $title[1];
+                    preg_match("/\<title\>(.*)\<\/title\>/siuU",$str,$title);
+                    return htmlspecialchars_decode($title[1]);
                 }
                 return '';
             }
@@ -72,6 +80,7 @@
                 $description = \Idno\Core\site()->currentPage()->getInput('description');
                 $tags = \Idno\Core\site()->currentPage()->getInput('tags');
                 $title = \Idno\Core\site()->currentPage()->getInput('title');
+                $access = \Idno\Core\site()->currentPage()->getInput('access');
 
                 if ($time = \Idno\Core\site()->currentPage()->getInput('created')) {
                     if ($time = strtotime($time)) {
@@ -91,15 +100,15 @@
                             } else {
                                 $this->pageTitle = '';
                             }
+                        } else {
+                        	$this->pageTitle = $title;
                         }
                         if (empty($title)) {
                             \Idno\Core\site()->session()->addErrorMessage('You need to specify a title.');
                             return false;
                         }
-                        $this->setAccess('PUBLIC');
+                        $this->setAccess($access);
                         if ($this->save($new)) {
-                            //$result = \Idno\Core\Webmention::pingMentions($this->getURL(), \Idno\Core\site()->template()->parseURLs($this->body));
-                            //$result = \Idno\Core\Webmention::pingMentions($this->getURL(), \Idno\Core\site()->template()->parseURLs($this->description));
                             return true;
                         }
                     } else {

@@ -8,7 +8,7 @@
      * check out the README.md file.
      *
      * Project homepage:    https://withknown.com/
-     * Project repo:        https://github.com/idno/idno
+     * Project repo:        https://github.com/idno/known
      *
      * @package idno
      * @subpackage core
@@ -35,23 +35,19 @@
         $path = substr($path, 0, -1);
     }
     if (!empty($path)) {
-        $routes[$path . '/'] = $routes['/'];
+        if (!empty($routes['/'])) {
+            $routes[$path . '/'] = $routes['/'];
+        }
     }
 
 // Manage routing
 
-    \Idno\Core\PageHandler::hook('404', function () {
+    \Idno\Core\PageHandler::hook('404', function ($params = array()) {
         http_response_code(404);
         $t = \Idno\Core\site()->template();
         
         // Take over page detection
-        $template = \Idno\Core\site()->currentPage()->getInput('_t');
-        if (!empty($template)) {
-            $t->setTemplateType(\Idno\Core\site()->currentPage()->getInput('_t'));
-        } else if (\Idno\Core\site()->currentPage()->isAcceptedContentType('application/json'))
-        {
-            $t->setTemplateType('json');
-        }
+        \Idno\Core\site()->template()->autodetectTemplateType();
         
         $t->__(array('body' => $t->draw('pages/404'), 'title' => 'Not found!'))->drawPage();
         exit;
