@@ -64,9 +64,6 @@
 [submodule "IdnoPlugins/Flickr"]
 	path = IdnoPlugins/Flickr
 	url = https://github.com/idno/Flickr.git
-[submodule "IdnoPlugins/IndiePub"]
-	path = IdnoPlugins/IndiePub
-	url = https://github.com/idno/IndiePub.git
 [submodule "IdnoPlugins/Checkin/external/leaflet-providers"]
 	path = IdnoPlugins/Checkin/external/leaflet-providers
 	url = https://github.com/leaflet-extras/leaflet-providers.git
