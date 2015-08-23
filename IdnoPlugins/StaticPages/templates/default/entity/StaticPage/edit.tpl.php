@@ -46,27 +46,18 @@
                            value="<?= htmlspecialchars($title) ?>" class="form-control"/>
                 </p>
 
-                <div class="pages col-md-3">
-                    <label for="body">
-                        Body </label>
-                </div>
-
-                <p style="text-align: right">
-                    <small>
-                        <a href="#"
-                           onclick="tinymce.EditorManager.execCommand('mceRemoveEditor',true, 'body'); $('#plainTextSwitch').hide(); $('#richTextSwitch').show(); return false;"
-                           id="plainTextSwitch">Switch to plain text editor</a>
-                        <a href="#"
-                           onclick="makeRich('#body'); $('#plainTextSwitch').show(); $('#richTextSwitch').hide(); return false;"
-                           id="richTextSwitch" style="display:none">Switch to rich text editor</a></small>
-                </p>
-                </p>
-                    
-                        <textarea name="body" id="body" placeholder="Tell your story"
-                                  class="form-control bodyInput mentionable wysiwyg"><?= htmlspecialchars($this->autop($body)) ?></textarea>
 
 
-
+                <?= $this->__([
+                    'name' => 'body',
+                    'value' => $vars['object']->body,
+                    'object' => $object,
+                    'wordcount' => false,
+                    'class' => 'wysiwyg',
+                    'height' => 100,
+                    'placeholder' => 'Tell your story',
+                    'label' => 'Body'
+                ])->draw('forms/input/richtext')?>
 
                 <?= $this->draw('entity/tags/input'); ?>
 
@@ -207,7 +198,7 @@
         function filePickerDialog(callback, value, meta) {
             tinymce.activeEditor.windowManager.open({
                 title: 'File Manager',
-                url: '<?=\Idno\Core\site()->config()->getDisplayURL()?>file/picker/?type=' + meta.filetype,
+                url: '<?=\Idno\Core\site()->config()->getDisplayURL()?>filepicker/?type=' + meta.filetype,
                 width: 650,
                 height: 550
             }, {

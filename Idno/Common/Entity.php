@@ -13,6 +13,7 @@
     namespace Idno\Common {
 
         use Idno\Core\Webmention;
+        use Idno\Entities\File;
         use Idno\Entities\User;
 
         class Entity extends Component implements EntityInterface
@@ -608,6 +609,7 @@
                 if (is_callable('mb_convert_encoding')) {
                     $slug = mb_convert_encoding($slug, 'UTF-8', 'UTF-8');
                 }
+
                 return $slug;
             }
 
@@ -635,6 +637,7 @@
                     }
                 }
                 $this->slug = $slug;
+
                 return $slug;
 
             }
@@ -869,6 +872,7 @@
                     $access = 'PUBLIC';
                 }
                 $this->access = $access;
+
                 return true;
                 /*if (
                     $access instanceof \Idno\Entities\AccessGroup ||
@@ -1124,8 +1128,9 @@
 
             function getShortDescription($words = 25)
             {
-                if (!empty($this->short_description))
+                if (!empty($this->short_description)) {
                     return $this->short_description;
+                }
 
                 $description = strip_tags($this->getDescription());
                 $description = implode(' ', array_slice(explode(' ', $description), 0, $words));
@@ -1267,6 +1272,7 @@
                 if (!empty($this->inreplyto)) {
                     return true;
                 }
+
                 return false;
             }
 
@@ -1280,8 +1286,10 @@
                     if (!is_array($this->inreplyto)) {
                         $this->inreplyto = [$this->inreplyto];
                     }
+
                     return $this->inreplyto;
                 }
+
                 return false;
             }
 
@@ -1331,16 +1339,19 @@
              * If entity/EntityClass doesn't exist, the template entity/template
              * is tried as a fallback.
              *
+             * @param $feed_view If set to true, draws a version of the entity suitable for including in a feed, eg
+             *                   RSS (false by default)
+             *
              * @return string The rendered entity.
              */
-            function draw()
+            function draw($feed_view = false)
             {
                 $t = \Idno\Core\site()->template();
 
                 if ($this instanceof User) {
-                    $params = ['user' => $this];
+                    $params = ['user' => $this, 'feed_view' => $feed_view];
                 } else {
-                    $params = ['object' => $this];
+                    $params = ['object' => $this, 'feed_view' => $feed_view];
                 }
 
                 $return = $t->__($params)->draw('entity/' . $this->getClassName(), false);
@@ -1373,8 +1384,8 @@
             public function jsonSerialize()
             {
                 $object = array(
-                    'id'      => $this->getUUID(),
-                    'content' => strip_tags($this->getDescription()),
+                    'id'          => $this->getUUID(),
+                    'content'     => strip_tags($this->getDescription()),
                     'formattedContent'
                                   => \Idno\Core\site()->template()->autop($this->getDescription()),
                     'displayName' => $this->getTitle(),
@@ -1395,6 +1406,12 @@
 
                 if ($attachments = $this->getAttachments()) {
                     foreach ($attachments as $attachment) {
+                        if (empty($attachment['mime-type'])) {
+                            $attachment['mime-type'] = 'application/octet-stream';
+                        }
+                        if (empty($attachment['length'])) {
+                            $attachment['length'] = 0;
+                        }
                         $object['attachments'][] = [
                             'url'       => preg_replace('/^(https?:\/\/\/)/u', \Idno\Core\site()->config()->url, $attachment['url']),
                             'mime-type' => $attachment['mime-type'],
@@ -1623,7 +1640,7 @@
                             if ($this->isReply()) {
                                 $webmentions = new Webmention();
                                 if ($reply_urls = $this->getReplyToURLs()) {
-                                    foreach($reply_urls as $reply_url) {
+                                    foreach ($reply_urls as $reply_url) {
                                         $webmentions->sendWebmentionPayload($this->getDisplayURL(), $reply_url);
                                     }
                                 }
@@ -1749,7 +1766,7 @@
                                     $mention['url'] = array_intersect($item['properties']['uid'], $item['properties']['url']);
                                 }
                                 if (empty($mention['url'])) {
-                                    $urls = $item['properties']['url'];
+                                    $mention['url'] = $item['properties']['url'];
                                 }
                             }
                             if (!empty($item['properties']['in-reply-to']) && is_array($item['properties']['in-reply-to'])) {

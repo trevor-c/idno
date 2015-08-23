@@ -40,7 +40,7 @@
                                     <small><?= $user->email ?></small>
                                 </p>
                             </div>
-                            <div class="col-sm-3 col-xs-6">
+                            <div class="col-sm-2 col-xs-6">
                                 <p class="user-tbl">
                                     <small><strong>Joined</strong><br><time datetime="<?= date('r', $user->created) ?>" class="dt-published"><?= date('r', $user->created) ?></time></small>
                                 </p>
@@ -49,7 +49,7 @@
                                 <p class="user-tbl">
                                     <small><strong>Last update posted</strong>
                                         <br>
-                                        <?php 
+                                        <?php
                                         if ($feed  = \Idno\Entities\ActivityStreamPost::getFromX(null, ['owner' => $user->getUUID()], array(), 1, 0)) {
                                         ?>
                                         <time datetime="<?= date('r', $feed[0]->updated) ?>" class="dt-published"><?= date('r', $feed[0]->updated) ?></time>
@@ -90,10 +90,15 @@
                                     </small>
                                 </p>
                             </div>
-                            <div class="col-sm-1 col-xs-6">
-                                <p class="user-tbl" style="padding-top: 20px;"><small>
+                            <div class="col-sm-2 col-xs-6">
+                                <p class="user-tbl"><small>
                 <?php
                 if ($user->getUUID() != \Idno\Core\site()->session()->currentUserUUID()) {
+                    if (\Idno\Core\site()->config()->emailIsBlocked($user->email)) {
+                        echo \Idno\Core\site()->actions()->createLink(\Idno\Core\site()->config()->getDisplayURL() . 'admin/users', '<i class="fa fa-check-circle-o"></i> Clear', array('blocked_emails' => $user->email, 'action' => 'unblock_emails'), array('class' => '', 'confirm' => true, 'confirm-text' => 'Are you sure? The user will be able to log in and post again.')) . '<br>';
+                    } else {
+                        echo \Idno\Core\site()->actions()->createLink(\Idno\Core\site()->config()->getDisplayURL() . 'admin/users', '<i class="fa fa-ban"></i> Block', array('blocked_emails' => $user->email, 'action' => 'block_emails'), array('class' => '', 'confirm' => true, 'confirm-text' => 'Are you sure? The user will be logged out and will no longer be able to log in or post.')) . '<br>';
+                    }
                     echo \Idno\Core\site()->actions()->createLink(\Idno\Core\site()->config()->getDisplayURL() . 'admin/users', '<i class="fa fa-times"></i> Delete', array('user' => $user->getUUID(), 'action' => 'delete'), array('class' => '', 'confirm' => true, 'confirm-text' => 'Are you sure? This will delete this user and all their content.'));
                 } else {
                     echo '&nbsp';
@@ -141,6 +146,115 @@
 
             </div>
         </div>
-    <?php
+        <?php
+        /*
+         * Temporarily removing this feature due to some security concerns
+         *
+        <div class="row">
+            <div class="col-md-10 col-md-offset-1">
+
+                <form action="<?= \Idno\Core\site()->config()->getDisplayURL() ?>admin/users" method="post">
+
+                    <h3>Create a new user</h3>
+
+                    <p>
+                        You should only do this for people whose email addresses you trust
+                        from prior correspondence. An email will not be sent.
+                    </p>
+
+                    <div>
+                        <input type="email" name="email" placeholder="Email address" required >
+                        <input type="text" name="handle" placeholder="Username" required >
+                        <input type="text" name="name" placeholder="Full name" required >
+                        <input type="password" name="password1" placeholder="Password" required>
+                        <input type="password" name="password2" placeholder="Password again" required>
+                    </div>
+
+                    <p>
+
+                    </p>
+
+                    <p>
+                        <input type="submit" class="btn btn-primary" value="Add">
+                        <input type="hidden" name="action" value="add_user">
+                        <?= \Idno\Core\site()->actions()->signForm('/admin/users') ?>
+                    </p>
+
+                </form>
+            </div>
+        </div>
+        */ ?>
+        <div class="row">
+            <div class="col-md-10 col-md-offset-1">
+
+                <form action="<?= \Idno\Core\site()->config()->getDisplayURL() ?>admin/users" method="post">
+
+                    <h3>Block email addresses</h3>
+
+                    <p>
+                        By blocking email addresses, you prevent people using those email addresses from registering on
+                        your site. Enter the email addresses you want to block below.
+                    </p>
+
+                    <textarea name="blocked_emails" class="form-control" placeholder="user@email.com"></textarea>
+
+                    <p>
+                        <input type="submit" class="btn btn-primary" value="Block email addresses">
+                        <input type="hidden" name="action" value="block_emails">
+                        <?= \Idno\Core\site()->actions()->signForm('/admin/users') ?>
+                    </p>
+
+                </form>
+
+            </div>
+        </div>
+        <?php
+
+            if ($blocked_emails = \Idno\Core\site()->config()->getBlockedEmails()) {
+
+?>
+        <div class="row">
+            <div class="col-md-10 col-md-offset-1">
+                <h3>Blocked email addresses</h3>
+            </div>
+        </div>
+        <div class="row">
+            <div class="pane col-md-10 col-md-offset-1">
+                <?php
+
+                    foreach($blocked_emails as $email) {
+
+                        ?>
+                <div class="row ">
+                    <div class="col-sm-4 col-xs-12">
+                        <p class="user-tbl">
+                            <?=$email?>
+                        </p>
+                    </div>
+                    <div class="col-sm-8 col-xs-12">
+                        <p class="user-tbl" style="text-align: right">
+                            <small>
+                            <?php
+
+                                echo \Idno\Core\site()->actions()->createLink(\Idno\Core\site()->config()->getDisplayURL() . 'admin/users', '<i class="fa fa-times"></i> Remove block', array('blocked_emails' => $email, 'action' => 'unblock_emails'), array('class' => '', 'confirm' => true, 'confirm-text' => 'Are you sure? The user will be able to log in and post again.')) . '<br>';
+
+                            ?>
+                            </small>
+                        </p>
+                    </div>
+                </div>
+                        <?php
+
+                    }
+
+                ?>
+            </div>
+        </div>
+<?php
+
+            }
+
+        ?>
+<?php
 
     }

@@ -11,6 +11,11 @@
         <form action="<?= \Idno\Core\site()->config()->getDisplayURL() ?>admin/" class="navbar-form admin" method="post">
 
             <div class="row">
+                <div class="col-md-10">
+                    <h3>Site Details</h3>
+                </div>
+            </div>
+            <div class="row">
                 <div class="col-md-2">
                     <p><label class="control-label" for="name"><strong>Site name</strong></label></p>
                 </div>
@@ -27,16 +32,57 @@
 
             <div class="row">
                 <div class="col-md-2">
-                    <p><label class="control-label" for="description"><strong>Site description</strong></label></p>
+                    <p><label class="control-label" for="description"><strong>Site summary</strong></label></p>
                 </div>
                 <div class="col-md-4">
                     <input type="text" id="name" placeholder="Site description" class="input col-md-4 form-control" name="description"
                            value="<?= htmlspecialchars(\Idno\Core\site()->config()->description) ?>">
                 </div>
                 <div class="col-md-6">
-                    <p class="config-desc">You might want to add a short tagline for your site.</p>
+                    <p class="config-desc">What's your site about?</p>
                 </div>
             </div>
+
+            <!----------->
+
+            <div class="row">
+                <div class="col-md-2">
+                    <p><label class="control-label" for="homepage-title"><strong>Homepage title</strong></label></p>
+                </div>
+                <div class="col-md-4">
+                    <input type="text" id="homepage-title" placeholder="Homepage title" class="input col-md-4 form-control" name="homepagetitle"
+                           value="<?= htmlspecialchars(\Idno\Core\site()->config()->homepagetitle) ?>">
+                </div>
+                <div class="col-md-6">
+                    <p class="config-desc">What should the browser display as the title on your homepage?<br>By default this is just your site title.</p>
+                </div>
+            </div>
+
+            <!-------->
+
+            <div class="row">
+                <div class="col-md-2">
+                    <p><label class="control-label" for="items_per_page"><strong>Items per page</strong></label></p>
+                </div>
+                <div class="col-md-4">
+                    <input type="text" id="items_per_page" placeholder="10" class="input col-md-4 form-control" name="items_per_page"
+                           value="<?= htmlspecialchars(\Idno\Core\site()->config()->items_per_page) ?>">
+                </div>
+                <div class="col-md-6"><p class="config-desc">This is the number of content posts displayed on each page.</p>
+                </div>
+            </div>
+
+            <?=$this->draw('admin/home/settings/details')?>
+
+            <!----------->
+
+            <div class="row">
+                <div class="col-md-10">
+                    <h3>Registration and privacy</h3>
+                </div>
+            </div>
+
+            <!----------->
 
             <div class="row">
                 <div class="col-md-2">
@@ -57,6 +103,7 @@
                 if (\Idno\Core\site()->config()->walled_garden == true || \Idno\Core\site()->config()->canMakeSitePrivate()) {
 
                     ?>
+
                     <!---------->
                     <div class="row">
                         <div class="col-md-2">
@@ -78,6 +125,44 @@
 
             ?>
 
+            <?php
+
+                if (\Idno\Core\site()->config()->show_privacy == true || \Idno\Core\site()->config()->canMakeSitePrivate()) {
+
+                    ?>
+                    <!---------->
+
+                    <div class="row">
+                        <div class="col-md-2">
+                            <p><label class="control-label" for="show_privacy"><strong>Per-post privacy</strong></label>
+                            </p>
+                        </div>
+                        <div class="config-toggle col-md-4">
+                            <input type="checkbox" data-toggle="toggle" data-onstyle="info" data-on="Yes" data-off="No"
+                                   name="show_privacy" id="show_privacy"
+                                   value="true" <?php if (\Idno\Core\site()->config()->show_privacy == true) echo 'checked'; ?>>
+                        </div>
+                        <div class="col-md-6"><p class="config-desc">
+                                Show per-post privacy settings.
+                            </p>
+                        </div>
+                    </div>
+                    <?php
+
+                }
+
+                echo $this->draw('admin/home/settings/privacy');
+                
+            ?>
+
+            <!---------->
+
+            <div class="row">
+                <div class="col-md-10">
+                    <h3>Technical Settings</h3>
+                </div>
+            </div>
+
             <!---------->
 
             <div class="row">
@@ -90,24 +175,9 @@
                 </div>
                 <div class="col-md-6">
                     <p class="config-desc">You can probably leave this as is.
-                        Learn more about
-                        <a href="https://code.google.com/p/pubsubhubbub/" target="_blank">PuSH</a>.
+                        <a href="https://code.google.com/p/pubsubhubbub/" target="_blank">Learn more about PuSH</a>.
 
                     </p>
-                </div>
-            </div>
-
-            <!----------->
-
-            <div class="row">
-                <div class="col-md-2">
-                    <p><label class="control-label" for="items_per_page"><strong>Items per page</strong></label></p>
-                </div>
-                <div class="col-md-4">
-                    <input type="text" id="items_per_page" placeholder="10" class="input col-md-4 form-control" name="items_per_page"
-                           value="<?= htmlspecialchars(\Idno\Core\site()->config()->items_per_page) ?>">
-                </div>
-                <div class="col-md-6"><p class="config-desc">This is the number of content posts displayed on each page.</p>
                 </div>
             </div>
 
@@ -139,29 +209,14 @@
                            name="indieweb_reference" id="include_permalinks"
                            value="true" <?php if (\Idno\Core\site()->config()->indieweb_reference == true) echo 'checked'; ?>>
                 </div>
-                <div class="col-md-6"><p class="config-desc">Add a permalink to the original content when you
-                        cross-post.</p>
+                <div class="col-md-6"><p class="config-desc">Always add a link back to your site when you
+                        syndicate to external networks.</p>
                 </div>
             </div>
 
             <!---------->
 
-            <div class="row">
-                <div class="col-md-2">
-                    <p><label class="control-label" for="hide_privacy"><strong>Hide post privacy</strong></label></p>
-                </div>
-                <div class="config-toggle col-md-4">
-                    <input type="checkbox" data-toggle="toggle" data-onstyle="info" data-on="Yes" data-off="No"
-                           name="hide_privacy" id="hide_privacy"
-                           value="true" <?php if (\Idno\Core\site()->config()->hide_privacy == true) echo 'checked'; ?>>
-                </div>
-                <div class="col-md-6"><p class="config-desc">
-                        Hide per-post privacy settings.
-                    </p>
-                </div>
-            </div>
-
-            <!---------->
+            <?=$this->draw('admin/home/settings/technical')?>
 
             <?=$this->draw('admin/home/settings')?>
 

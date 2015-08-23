@@ -9,6 +9,8 @@ listings here do not imply endorsement by the Known project team in any way.
 ### Content types
 
 * [Video](https://github.com/tjgillies/Video) - Post videos to your Known site, by [Tyler Gillies](http://tylergillies.club/)
+* [Recipe](https://github.com/cleverdevil/Known-Recipes) – Post recipes to your Known site, by [Jonathan LaCour](https://cleverdevil.io)
+* [Review](https://github.com/cleverdevil/Known-Reviews) – Post reviews to your Known site, by [Jonathan LaCour](https://cleverdevil.io)
 
 ### Syndication plugins
 
@@ -31,6 +33,9 @@ listings here do not imply endorsement by the Known project team in any way.
     by [Marcus Povey](https://www.marcus-povey.co.uk)
 
 * [Diaspora](https://github.com/Phyks/KnownDiaspora) - Crosspost content to a Diaspora site, by [Lukas Verney](http://phyks.me/)
+
+* [IRC](https://github.com/mapkyca/KnownIRC) - Post messages and links into IRC channels, 
+    by [Marcus Povey](https://www.marcus-povey.co.uk)
 
 ### System and Security
 

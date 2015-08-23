@@ -9,6 +9,7 @@
 
     namespace Idno\Core {
 
+        use Idno\Common\Entity;
         use Idno\Entities\User;
 
         class Session extends \Idno\Common\Component
@@ -42,7 +43,6 @@
                 session_start();
                 session_cache_limiter('public');
 
-
                 // Flag insecure sessions (so we can check state changes etc)
                 if (!isset($_SESSION['secure'])) {
                     $_SESSION['secure'] = site()->isSecure();
@@ -57,7 +57,6 @@
                     session_destroy();
                 }
 
-
                 // Session login / logout
                 site()->addPageHandler('/session/login', '\Idno\Pages\Session\Login', true);
                 site()->addPageHandler('/session/logout', '\Idno\Pages\Session\Logout');
@@ -68,8 +67,18 @@
 
                     $eventdata = $event->data();
                     $object    = $eventdata['object'];
+                    if ((!empty($this->user)) && ($this->user instanceof User)) {
+                        $user_uuid = $object->getUUID() == $this->user->getUUID();
+                    } else {
+                        $user_uuid = false;
+                    }
+                    if ($object instanceof Entity) {
+                        $object_uuid = $object->getUUID();
+                    } else {
+                        $object_uuid = false;
+                    }
                     if ((!empty($object)) && ($object instanceof \Idno\Entities\User) // Object is a user
-                        && ((!empty($_SESSION['user_uuid'])) && ($object->getUUID() == $this->user->getUUID()))
+                        && ((!empty($_SESSION['user_uuid'])) && (($object_uuid != $user_uuid) && $object_uuid !== false))
                     ) // And we're not trying a user change (avoids a possible exploit)
                     {
                         $this->user = $this->refreshSessionUser($object);
@@ -393,6 +402,16 @@
 
                 // If this is an API request but we're not logged in, set page response code to access denied
                 if ($this->isAPIRequest() && !$return) {
+                    
+                    $ip = $_SERVER['REMOTE_ADDR'];
+                    if (isset($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+                         $proxies = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']); // We are behind a proxy 
+                         $ip = trim($proxies[0]);
+                    }
+
+                    site()->logging()->log("API Login failure from $ip", LOGLEVEL_ERROR); 
+                    //\Idno\Core\site()->triggerEvent('login/failure/api'); // Can't be used until #918 is fixed.
+                    
                     site()->currentPage()->setResponse(403);
                 }
 
@@ -409,10 +428,12 @@
 
             function logUserOn(\Idno\Entities\User $user)
             {
+                if (site()->config()->emailIsBlocked($user->email)) {
+                    $this->logUserOff();
+                    return false;
+                }
                 $return = $this->refreshSessionUser($user);
-
-                session_regenerate_id(true);
-
+                @session_regenerate_id(true);
                 return \Idno\Core\site()->triggerEvent('user/auth', array('user' => $user), $return);
             }
 
@@ -424,6 +445,12 @@
             function refreshSessionUser(\Idno\Entities\User $user)
             {
                 if ($user = User::getByUUID($user->getUUID())) {
+
+                    if (site()->config()->emailIsBlocked($user->email)) {
+                        $this->logUserOff();
+                        return false;
+                    }
+
                     $_SESSION['user_uuid'] = $user->getUUID();
                     $this->user            = $user;
 
@@ -439,7 +466,11 @@
             function refreshCurrentSessionuser()
             {
                 if (!$this->currentUser() && !empty($_SESSION['user_uuid'])) {
-                    $this->user = User::getByUUID($_SESSION['user_uuid']);
+                    if ($this->user = User::getByUUID($_SESSION['user_uuid'])) {
+                        if (site()->config()->emailIsBlocked($this->user->email)) {
+                            $this->logUserOff();
+                        }
+                    }
                 } else if ($this->isLoggedIn()) {
                     $user_uuid = $this->currentUserUUID();
                     if ($user = User::getByUUID($user_uuid)) {
