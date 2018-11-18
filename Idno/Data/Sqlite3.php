@@ -10,18 +10,15 @@
 
     namespace Idno\Data {
 
-        class Sqlite3 extends \Idno\Core\DataConcierge
+        class Sqlite3 extends AbstractSQL
         {
-
-            private $client = null;
-            private $database = null;
 
             function init()
             {
 
                 try {
 
-                    $connection_string = "sqlite:" . \Idno\Core\site()->config()->dbname;
+                    $connection_string = "sqlite:" . $this->dbname;
                     $this->client      = new \PDO($connection_string);
                     $this->client->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
                     $this->client->exec("SELECT * from versions;"); // Quick and dirty check to see if database is installed TODO: do this better.
@@ -34,28 +31,32 @@
                         if (file_exists($filename)) {
                             $dbh->exec(@file_get_contents($filename));
                         } else {
+                            http_response_code(500);
                             $messages = '<p>We couldn\'t find the schema doc.</p>';
                             die($messages);
                         }
 
                     } else {
 
-                        if (!empty(\Idno\Core\site()->config()->forward_on_empty)) {
-                            header('Location: ' . \Idno\Core\site()->config()->forward_on_empty);
+                        if (!empty(\Idno\Core\Idno::site()->config()->forward_on_empty)) {
+                            header('Location: ' . \Idno\Core\Idno::site()->config()->forward_on_empty);
                             exit;
                         } else {
-                            if (\Idno\Core\site()->config()->debug) {
+
+                            http_response_code(500);
+
+                            if (\Idno\Core\Idno::site()->config()->debug) {
                                 $message = '<p>' . $e->getMessage() . '</p>';
                                 $message .= '<p>' . $connection_string . '</p>';
                             }
                             error_log($e->getMessage());
-                            include \Idno\Core\site()->config()->path . '/statics/db.php';
+                            include \Idno\Core\Idno::site()->config()->path . '/statics/db.php';
                             exit;
                         }
                     }
                 }
 
-                $this->database = \Idno\Core\site()->config()->dbname;
+                $this->database = $this->dbname;
                 $this->checkAndUpgradeSchema();
             }
 
@@ -66,11 +67,40 @@
             {
                 if ($versions = $this->getVersions()) {
                     foreach ($versions as $version) {
-                        if ($version->label == 'schema') {
+                        if ($version->label === 'schema') {
                             $basedate          = $newdate = (int)$version->value;
                             $upgrade_sql_files = array();
-                            $schema_dir        = dirname(dirname(dirname(__FILE__))) . '/schemas/sqllite3/';
+                            $schema_dir        = dirname(dirname(dirname(__FILE__))) . '/schemas/sqlite3/';
                             $client            = $this->client;
+                            
+                            
+                            foreach ([
+                                // List upgrades, add yours to the end
+                                2016102601,
+                                2016110301,
+                                2017032001,
+                            ] as $date) {
+                                if ($basedate < $date) {
+                                    if ($sql = @file_get_contents($schema_dir . $date . '.sql')) {
+                                        
+                                        error_log("Applying schema updates from {$schema_dir}{$date}.sql");
+                                        
+                                        $statements = explode(";\n", $sql); // Explode statements; only mysql can support multiple statements per line, and then only badly.
+                                        foreach ($statements as $sql) {
+                                            $sql = trim($sql);
+                                            if (!empty($sql)) {
+                                                try {
+                                                    $statement = $client->prepare($sql);
+                                                    $statement->execute();
+                                                } catch (\Exception $e) {
+                                                    error_log($e->getMessage());
+                                                }
+                                            }
+                                        }
+                                    }
+                                    $newdate = $date;
+                                }
+                            }
                         }
                     }
                 }
@@ -90,58 +120,11 @@
                         return $statement->fetchAll(\PDO::FETCH_OBJ);
                     }
                 } catch (\Exception $e) {
-                    //\Idno\Core\site()->logging()->log($e->getMessage());
+                    //\Idno\Core\Idno::site()->logging()->error($e->getMessage());
                     error_log($e->getMessage());
                 }
 
                 return false;
-            }
-
-            /**
-             * Handle the session in Sqlite3
-             */
-            function handleSession()
-            {
-                if (version_compare(phpversion(), '5.3', '>')) {
-                    $sessionHandler = new \Symfony\Component\HttpFoundation\Session\Storage\Handler\PdoSessionHandler(\Idno\Core\site()->db()->getClient(),
-                        array(
-                            'db_table'    => 'session',
-                            'db_id_col'   => 'session_id',
-                            'db_data_col' => 'session_value',
-                            'db_time_col' => 'session_time',
-                        )
-                    );
-
-                    session_set_save_handler($sessionHandler, true);
-                }
-            }
-
-            /**
-             * Returns an instance of the database reference variable
-             * @return string;
-             */
-            function getDatabase()
-            {
-                return $this->database;
-            }
-
-            /**
-             * Returns an instance of the database client reference variable
-             * @return \PDO
-             */
-            function getClient()
-            {
-                return $this->client;
-            }
-
-            /**
-             * Sqlite3 doesn't need the ID to be processed.
-             * @param $id
-             * @return string
-             */
-            function processID($id)
-            {
-                return $id;
             }
 
             /**
@@ -162,20 +145,25 @@
                     }
                 }*/
 
+                $collection = $this->sanitiseCollection($collection);
+
                 if (empty($array['_id'])) {
-                    $array['_id'] = md5(rand(0, 9999) . time());
+                    $array['_id'] = md5(mt_rand() . microtime(true));
                 }
                 if (empty($array['uuid'])) {
-                    $array['uuid'] = \Idno\Core\site()->config()->getURL() . 'view/' . $array['_id'];
+                    $array['uuid'] = \Idno\Core\Idno::site()->config()->getURL() . 'view/' . $array['_id'];
                 }
                 if (empty($array['owner'])) {
                     $array['owner'] = '';
                 }
                 try {
                     $contents = json_encode($array);
+                    
+                    if (json_last_error() != JSON_ERROR_NONE)
+                        throw new \Exception(json_last_error_msg());
                 } catch (\Exception $e) {
                     $contents = json_encode([]);
-                    \Idno\Core\site()->logging()->log($e->getMessage());
+                    \Idno\Core\Idno::site()->logging()->error($e->getMessage());
 
                     return false;
                 }
@@ -195,6 +183,9 @@
                 if (empty($array['entity_subtype'])) {
                     $array['entity_subtype'] = 'Idno\\Common\\Entity';
                 }
+                if (empty($array['publish_status'])) {
+                    $array['publish_status'] = 'published';
+                }
                 if (empty($array['created'])) {
                     $array['created'] = date("Y-m-d H:i:s", time());
                 } else {
@@ -212,10 +203,10 @@
                 try {
 
                     $statement = $client->prepare("insert or replace into {$collection}
-                                                    (`uuid`, `_id`, `entity_subtype`,`owner`, `created`, `contents`)
+                                                    (`uuid`, `_id`, `entity_subtype`,`owner`, `created`, `contents`, `publish_status`)
                                                     values
-                                                    (:uuid, :id, :subtype, :owner, :created, :contents)");
-                    if ($statement->execute(array(':uuid' => $array['uuid'], ':id' => $array['_id'], ':owner' => $array['owner'], ':subtype' => $array['entity_subtype'], ':contents' => $contents, ':created' => $array['created']))) {
+                                                    (:uuid, :id, :subtype, :owner, :created, :contents, :status)");
+                    if ($statement->execute(array(':uuid' => $array['uuid'], ':id' => $array['_id'], ':owner' => $array['owner'], ':subtype' => $array['entity_subtype'], ':contents' => $contents, ':status' => $array['publish_status'], ':created' => $array['created']))) {
 
                         // Update FTS Lookup
                         $statement = $client->prepare("insert or replace into {$collection}_search
@@ -235,9 +226,12 @@
                                 if (is_array($value) || is_object($value)) {
                                     try {
                                         $value = json_encode($value);
+                                        
+                                        if (json_last_error() != JSON_ERROR_NONE)
+                                            throw new \Exception(json_last_error_msg());
                                     } catch (\Exception $e) {
                                         $value = json_encode([]);
-                                        \Idno\Core\site()->logging()->log($e->getMessage());
+                                        \Idno\Core\Idno::site()->logging()->error($e->getMessage());
                                     }
                                 }
                                 if (empty($value)) {
@@ -252,7 +246,7 @@
                         return $array['_id'];
                     }
                 } catch (\Exception $e) {
-                    \Idno\Core\site()->logging()->log($e->getMessage());
+                    \Idno\Core\Idno::site()->logging()->error($e->getMessage());
                 }
 
                 return false;
@@ -269,12 +263,16 @@
             function getRecordByUUID($uuid, $collection = 'entities')
             {
                 try {
+                    $collection = $this->sanitiseCollection($collection);
+
                     $statement = $this->client->prepare("select distinct {$collection}.* from " . $collection . " where uuid = :uuid");
                     if ($statement->execute(array(':uuid' => $uuid))) {
-                        return $statement->fetch(\PDO::FETCH_ASSOC);
+                        if ($row = $statement->fetch(\PDO::FETCH_ASSOC)) {
+                            return json_decode($row['contents'], true);
+                        }
                     }
                 } catch (\Exception $e) {
-                    \Idno\Core\site()->logging()->log($e->getMessage());
+                    \Idno\Core\Idno::site()->logging()->error($e->getMessage());
                 }
 
                 return false;
@@ -290,9 +288,13 @@
 
             function getRecord($id, $collection = 'entities')
             {
+                $collection = $this->sanitiseCollection($collection);
+
                 $statement = $this->client->prepare("select {$collection}.* from " . $collection . " where _id = :id");
                 if ($statement->execute(array(':id' => $id))) {
-                    return $statement->fetch(\PDO::FETCH_ASSOC);
+                    if ($row = $statement->fetch(\PDO::FETCH_ASSOC)) {
+                        return json_decode($row['contents'], true);
+                    }
                 }
 
                 return false;
@@ -302,121 +304,25 @@
              * Retrieves ANY record from a collection
              *
              * @param string $collection
-             * @return mixed
+             * @return array
              */
             function getAnyRecord($collection = 'entities')
             {
                 try {
+                    $collection = $this->sanitiseCollection($collection);
+
                     $statement = $this->client->prepare("select {$collection}.* from " . $collection . " limit 1");
                     if ($statement->execute()) {
                         if ($row = $statement->fetch(\PDO::FETCH_ASSOC)) {
-                            if ($obj = $this->rowToEntity($row)) {
-                                return $obj;
-                            }
-
-                            return $row;
+                            return json_decode($row['contents'], true);
                         }
                     }
                 } catch (\Exception $e) {
-                    if (\Idno\Core\site()->session() == null)
+                    if (\Idno\Core\Idno::site()->session() == null)
                         die($e->getMessage());
                 }
 
                 return false;
-            }
-
-            /**
-             * Converts a database row into a Known entity
-             *
-             * @param array $row
-             * @return \Idno\Common\Entity
-             */
-            function rowToEntity($row)
-            {
-                if (!empty($row['entity_subtype']) && !empty($row['contents'])) {
-                    if (class_exists($row['entity_subtype'])) {
-
-                        $contents = (array)json_decode($row['contents'], true);
-
-                        $object = new $row['entity_subtype']();
-                        $object->loadFromArray($contents);
-
-                        return $object;
-                    }
-                }
-
-                return false;
-            }
-
-            /**
-             * Retrieve objects of a certain kind that we're allowed to see,
-             * (or excluding kinds that we don't want to see),
-             * in reverse chronological order
-             *
-             * @param string|array $subtypes String or array of subtypes we're allowed to see
-             * @param array $search Any extra search terms in array format (eg array('foo' => 'bar')) (default: empty)
-             * @param array $fields An array of fieldnames to return (leave empty for all; default: all)
-             * @param int $limit Maximum number of records to return (default: 10)
-             * @param int $offset Number of records to skip (default: 0)
-             * @param string $collection Collection to query; default: entities
-             * @return array|false Array of elements or false, depending on success
-             */
-
-            function getObjects($subtypes = '', $search = array(), $fields = array(), $limit = 10, $offset = 0, $collection = 'entities')
-            {
-
-                // Initialize query parameters to be an empty array
-                $query_parameters = array();
-
-                // Ensure subtypes are recorded properly
-                // and remove subtypes that have an exclamation mark before them
-                // from consideration
-                if (!empty($subtypes)) {
-                    $not = array();
-                    if (!is_array($subtypes)) {
-                        $subtypes = array($subtypes);
-                    }
-                    foreach ($subtypes as $key => $subtype) {
-                        if (substr($subtype, 0, 1) == '!') {
-                            unset($subtypes[$key]);
-                            $not[] = substr($subtype, 1);
-                        }
-                    }
-                    if (!empty($subtypes)) {
-                        $query_parameters['entity_subtype']['$in'] = $subtypes;
-                    }
-                    if (!empty($not)) {
-                        $query_parameters['entity_subtype']['$not'] = $not;
-                    }
-                }
-
-                // Make sure we're only getting objects that we're allowed to see
-                $readGroups                 = \Idno\Core\site()->session()->getReadAccessGroupIDs();
-                $query_parameters['access'] = array('$in' => $readGroups);
-
-                // Join the rest of the search query elements to this search
-                $query_parameters = array_merge($query_parameters, $search);
-
-                // Prepare the fields array for searching, if required
-                if (!empty($fields) && is_array($fields)) {
-                    $fields = array_flip($fields);
-                    $fields = array_fill_keys($fields, true);
-                } else {
-                    $fields = array();
-                }
-
-                // Run the query
-                if ($results = $this->getRecords($fields, $query_parameters, $limit, $offset, $collection)) {
-                    $return = array();
-                    foreach ($results as $row) {
-                        $return[] = $this->rowToEntity($row);
-                    }
-
-                    return $return;
-                }
-
-                return array();
-
             }
 
             /**
@@ -433,6 +339,8 @@
             function getRecords($fields, $parameters, $limit, $offset, $collection = 'entities')
             {
                 try {
+
+                    $collection = $this->sanitiseCollection($collection);
 
                     // Build query
                     $query            = "select distinct {$collection}.* from {$collection} ";
@@ -459,12 +367,19 @@
 
                     $statement = $client->prepare($query);
 
-                    if ($result = $statement->execute($variables)) {
-                        return $statement->fetchAll(\PDO::FETCH_ASSOC);
+                    if ($statement->execute($variables)) {
+                        if ($rows = $statement->fetchAll(\PDO::FETCH_ASSOC)) {
+                            $records = [];
+                            foreach ($rows as $row) {
+                                $records[] = json_decode($row['contents'], true);
+                            }
+
+                            return $records;
+                        }
                     }
 
                 } catch (\Exception $e) {
-                    \Idno\Core\site()->logging()->log($e->getMessage());
+                    \Idno\Core\Idno::site()->logging()->error($e->getMessage());
 
                     return false;
                 }
@@ -499,9 +414,9 @@
                     $subwhere = array();
                     foreach ($params as $key => $value) {
                         if (!is_array($value)) {
-                            if (in_array($key, array('uuid', '_id', 'entity_subtype', 'owner', 'created'))) {
+                            if (in_array($key, $this->getSchemaFields())) {
                                 $subwhere[] = "(`{$collection}`.`{$key}` = :nonmdvalue{$non_md_variables})";
-                                if ($key == 'created') {
+                                if ($key === 'created') {
                                     if (!is_int($value)) {
                                         $value = strtotime($value);
                                     }
@@ -515,43 +430,52 @@
                                 $variables[":value{$metadata_joins}"] = $value;
                             }
                         } else {
-                            if (!empty($value['$or'])) {
-                                $subwhere[] = "(" . $this->build_where_from_array($value['$or'], $variables, $metadata_joins, $non_md_variables, 'or', $collection) . ")";
-                            }
                             if (!empty($value['$not'])) {
                                 if (!empty($value['$not']['$in'])) {
-                                    $value['$not'] = array_merge($value['$not'], $value['$not']['$in']);
-                                    unset($value['$not']['$in']);
+                                    if (in_array($key, $this->getSchemaFields())) {
+                                        $notstring = "`{$collection}`.`$key` not in(";
+                                        $i         = 0;
+                                        foreach ($value['$not']['$in'] as $val) {
+                                            if ($i > 0) $notstring .= ', ';
+                                            $notstring .= ":nonmdvalue{$non_md_variables}";
+                                            $variables[":nonmdvalue{$non_md_variables}"] = $val;
+                                            $non_md_variables++;
+                                            $i++;
+                                        }
+                                        $notstring .= ")";
+                                    } else {
+                                        $metadata_joins++;
+                                        $notstring                           = "(md{$metadata_joins}.`name` = :name{$metadata_joins} and md{$metadata_joins}.`collection` = '{$collection}' and md{$metadata_joins}.`value` not in (";
+                                        $variables[":name{$metadata_joins}"] = $key;
+                                        $i                                   = 0;
+                                        foreach ($value['$not']['$in'] as $val) {
+                                            if ($i > 0) $notstring .= ', ';
+                                            $notstring .= ":nonmdvalue{$non_md_variables}";
+                                            $variables[":nonmdvalue{$non_md_variables}"] = $val;
+                                            $non_md_variables++;
+                                            $i++;
+                                        }
+                                        $notstring .= "))";
+                                    }
                                 }
-                                if (in_array($key, array('uuid', '_id', 'entity_subtype', 'owner'))) {
-                                    $notstring = "`{$collection}`.`$key` not in(";
-                                    $i         = 0;
-                                    foreach ($value['$not'] as $val) {
-                                        if ($i > 0) $notstring .= ', ';
-                                        $notstring .= ":nonmdvalue{$non_md_variables}";
-                                        $variables[":nonmdvalue{$non_md_variables}"] = $val;
+                                // simple $not
+                                else {
+                                    if (in_array($key, $this->getSchemaFields())) {
+                                        $notstring                                   = "`{$collection}`.`$key` != :nonmdvalue{$non_md_variables}";
+                                        $variables[":nonmdvalue{$non_md_variables}"] = $value['$not'];
                                         $non_md_variables++;
-                                        $i++;
-                                    }
-                                    $notstring .= ")";
-                                } else {
-                                    $metadata_joins++;
-                                    $notstring                           = "(md{$metadata_joins}.`name` = :name{$metadata_joins} and md{$metadata_joins}.`collection` = '{$collection}' and md{$metadata_joins}.`value` not in (";
-                                    $variables[":name{$metadata_joins}"] = $key;
-                                    $i                                   = 0;
-                                    foreach ($value['$not'] as $val) {
-                                        if ($i > 0) $notstring .= ', ';
-                                        $notstring .= ":nonmdvalue{$non_md_variables}";
-                                        $variables[":nonmdvalue{$non_md_variables}"] = $val;
+                                    } else {
+                                        $metadata_joins++;
+                                        $notstring = "(md{$metadata_joins}.`name`    = :name{$metadata_joins} and md{$metadata_joins}.`collection` = '{$collection}' and md{$metadata_joins}.`value` != :nonmdvalue{$non_md_variables})";
+                                        $variables[":name{$metadata_joins}"]         = $key;
+                                        $variables[":nonmdvalue{$non_md_variables}"] = $value['$not'];
                                         $non_md_variables++;
-                                        $i++;
                                     }
-                                    $notstring .= "))";
                                 }
                                 $subwhere[] = $notstring;
                             }
                             if (!empty($value['$in'])) {
-                                if (in_array($key, array('uuid', '_id', 'entity_subtype', 'owner'))) {
+                                if (in_array($key, $this->getSchemaFields())) {
                                     $instring = "`{$collection}`.`$key` in (";
                                     $i        = 0;
                                     foreach ($value['$in'] as $val) {
@@ -578,7 +502,46 @@
                                 }
                                 $subwhere[] = $instring;
                             }
-                            if ($key == '$search') {
+                            if (!empty($value['$lt'])) {
+                                $val = $value['$lt'];
+                                if (in_array($key, $this->getSchemaFields())) {
+                                    $subwhere[] = "(`{$collection}`.`{$key}` < :nonmdvalue{$non_md_variables})";
+                                    if ($key === 'created') {
+                                        if (!is_int($val)) {
+                                            $val = strtotime($val);
+                                        }
+                                    }
+                                    $variables[":nonmdvalue{$non_md_variables}"] = $val;
+                                    $non_md_variables++;
+                                } else {
+                                    $metadata_joins++;
+                                    $subwhere[]                           = "(md{$metadata_joins}.`name` = :name{$metadata_joins} and md{$metadata_joins}.`value` < :value{$metadata_joins} and md{$metadata_joins}.`collection` = '{$collection}')";
+                                    $variables[":name{$metadata_joins}"]  = $key;
+                                    $variables[":value{$metadata_joins}"] = $val;
+                                }
+                            }
+                            if (!empty($value['$gt'])) {
+                                $val = $value['$gt'];
+                                if (in_array($key, $this->getSchemaFields())) {
+                                    $subwhere[] = "(`{$collection}`.`{$key}` > :nonmdvalue{$non_md_variables})";
+                                    if ($key === 'created') {
+                                        if (!is_int($val)) {
+                                            $value = strtotime($val);
+                                        }
+                                    }
+                                    $variables[":nonmdvalue{$non_md_variables}"] = $val;
+                                    $non_md_variables++;
+                                } else {
+                                    $metadata_joins++;
+                                    $subwhere[]                           = "(md{$metadata_joins}.`name` = :name{$metadata_joins} and md{$metadata_joins}.`value` > :value{$metadata_joins} and md{$metadata_joins}.`collection` = '{$collection}')";
+                                    $variables[":name{$metadata_joins}"]  = $key;
+                                    $variables[":value{$metadata_joins}"] = $val;
+                                }
+                            }
+                            if ($key === '$or') {
+                                $subwhere[] = "(" . $this->build_where_from_array($value, $variables, $metadata_joins, $non_md_variables, 'or', $collection) . ")";
+                            }
+                            if ($key === '$search' && !empty($value)) {
                                 $val = $value[0]; // The search query is always in $value position [0] for now
 //                                if (strlen($val) > 5) {
 //                                    $subwhere[]                                  = " srch.search match :nonmdvalue{$non_md_variables} ";
@@ -600,52 +563,6 @@
             }
 
             /**
-             * Count objects of a certain kind that we're allowed to see
-             *
-             * @param string|array $subtypes String or array of subtypes we're allowed to see
-             * @param array $search Any extra search terms in array format (eg array('foo' => 'bar')) (default: empty)
-             * @param string $collection Collection to query; default: entities
-             */
-            function countObjects($subtypes = '', $search = array(), $collection = 'entities')
-            {
-
-                // Initialize query parameters to be an empty array
-                $query_parameters = array();
-
-                // Ensure subtypes are recorded properly
-                // and remove subtypes that have an exclamation mark before them
-                // from consideration
-                if (!empty($subtypes)) {
-                    $not = array();
-                    if (!is_array($subtypes)) {
-                        $subtypes = array($subtypes);
-                    }
-                    foreach ($subtypes as $key => $subtype) {
-                        if (substr($subtype, 0, 1) == '!') {
-                            unset($subtypes[$key]);
-                            $not[] = substr($subtype, 1);
-                        }
-                    }
-                    if (!empty($subtypes)) {
-                        $query_parameters['entity_subtype']['$in'] = $subtypes;
-                    }
-                    if (!empty($not)) {
-                        $query_parameters['entity_subtype']['$not'] = $not;
-                    }
-                }
-
-                // Make sure we're only getting objects that we're allowed to see
-                $readGroups                 = \Idno\Core\site()->session()->getReadAccessGroupIDs();
-                $query_parameters['access'] = array('$in' => $readGroups);
-
-                // Join the rest of the search query elements to this search
-                $query_parameters = array_merge($query_parameters, $search);
-
-                return $this->countRecords($query_parameters, $collection);
-
-            }
-
-            /**
              * Count the number of records that match the given parameters
              * @param array $parameters
              * @param string $collection The collection to interrogate (default: 'entities')
@@ -654,6 +571,8 @@
             function countRecords($parameters, $collection = 'entities')
             {
                 try {
+
+                    $collection = $this->sanitiseCollection($collection);
 
                     // Build query
                     $query            = "select count(distinct {$collection}.uuid) as total from {$collection} ";
@@ -681,25 +600,12 @@
                     }
 
                 } catch (Exception $e) {
-                    \Idno\Core\site()->logging()->log($e->getMessage());
+                    \Idno\Core\Idno::site()->logging()->error($e->getMessage());
 
                     return false;
                 }
 
                 return 0;
-            }
-
-            /**
-             * Get database errors
-             * @return mixed
-             */
-            function getErrors()
-            {
-                if (!empty($this->client)) {
-                    return $this->client->errorInfo();
-                }
-
-                return false;
             }
 
             /**
@@ -710,6 +616,8 @@
             function deleteRecord($id, $collection = 'entities')
             {
                 try {
+
+                    $collection = $this->sanitiseCollection($collection);
 
                     $client = $this->client;
                     /* @var \PDO $client */
@@ -722,7 +630,7 @@
 
                 } catch (\Exception $e) {
 
-                    \Idno\Core\site()->logging()->log($e->getMessage());
+                    \Idno\Core\Idno::site()->logging()->error($e->getMessage());
 
                     return false;
 
@@ -731,42 +639,10 @@
                 return false;
             }
 
-            /**
-             * Retrieve the filesystem associated with the current db, suitable for saving
-             * and retrieving files
-             * @return bool
-             */
-            function getFilesystem()
+            public function exportRecords($collection = 'entities', $limit = 10, $offset = 0)
             {
-                // We're not returning a filesystem for Sqlite3
-                return false;
-            }
-
-            /**
-             * Given a text query, return an array suitable for adding into getFromX calls
-             * @param $query
-             * @return array
-             */
-            function createSearchArray($query)
-            {
-                return array('$search' => array($query));
-            }
-
-            public function exportRecords($collection = 'entities')
-            {
-
-
                 return false; // TODO
             }
-        }
-
-        /**
-         * Helper function that returns the current database object
-         * @return \Idno\Core\DataConcierge
-         */
-        function db()
-        {
-            return \Idno\Core\site()->db();
         }
 
     }

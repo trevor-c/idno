@@ -51,11 +51,10 @@
                 <?= $this->__([
                     'name' => 'body',
                     'value' => $vars['object']->body,
-                    'object' => $object,
                     'wordcount' => false,
                     'class' => 'wysiwyg',
-                    'height' => 100,
-                    'placeholder' => 'Tell your story',
+                    'height' => 500,
+                    'placeholder' => 'Share something brilliant...',
                     'label' => 'Body'
                 ])->draw('forms/input/richtext')?>
 
@@ -124,7 +123,7 @@
                     <p style="margin-bottom: 20px">
                         <strong>Show the page title as a heading?</strong><br>
                         <label class="radio-inline">
-                            <input type="radio" name="optionsRadios" id="title-heading" value="0" <?php
+                            <input type="radio" name="hide_title" id="title-heading" value="0" <?php
 
                                 if (empty($hide_title)) {
                                     echo 'checked';
@@ -134,7 +133,7 @@
                             Yes
                         </label>
                         <label class="radio-inline">
-                            <input type="radio" name="optionsRadios" id="title-heading" value="1" <?php
+                            <input type="radio" name="hide_title" id="title-heading" value="1" <?php
 
                                 if (!empty($hide_title)) {
                                     echo 'checked';
@@ -152,10 +151,11 @@
 
                 </div>
 
+                <?= $this->draw('content/extra'); ?>
                 <?= $this->draw('content/access'); ?>
 
                 <p class="button-bar " style="text-align: right">
-                    <?= \Idno\Core\site()->actions()->signForm('/staticpages/edit') ?>
+                    <?= \Idno\Core\Idno::site()->actions()->signForm('/staticpages/edit') ?>
                     <input type="button" class="btn btn-cancel" value="Cancel" onclick="hideContentCreateForm();"/>
                     <input type="submit" class="btn btn-primary" value="Publish"/>
                 </p>
@@ -198,7 +198,7 @@
         function filePickerDialog(callback, value, meta) {
             tinymce.activeEditor.windowManager.open({
                 title: 'File Manager',
-                url: '<?=\Idno\Core\site()->config()->getDisplayURL()?>filepicker/?type=' + meta.filetype,
+                url: '<?=\Idno\Core\Idno::site()->config()->getDisplayURL()?>filepicker/?type=' + meta.filetype,
                 width: 650,
                 height: 550
             }, {

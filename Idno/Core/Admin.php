@@ -25,9 +25,26 @@
                 site()->addPageHandler('/admin/users/?', '\Idno\Pages\Admin\Users');
                 site()->addPageHandler('/admin/export/?', '\Idno\Pages\Admin\Export');
                 site()->addPageHandler('/admin/export/generate/?', '\Idno\Pages\Admin\Export\Generate');
-                site()->addPageHandler('/admin/export/download/?', '\Idno\Pages\Admin\Export\Download');
+                //site()->addPageHandler('/admin/export/download/?', '\Idno\Pages\Admin\Export\Download');
+                site()->addPageHandler('/admin/export/rss/?', '\Idno\Pages\Admin\Export\RSS');
                 site()->addPageHandler('/admin/import/?', '\Idno\Pages\Admin\Import');
                 site()->addPageHandler('/admin/diagnostics/?', '\Idno\Pages\Admin\Diagnostics');
+                site()->addPageHandler('/admin/statistics/?', '\Idno\Pages\Admin\Statistics');
+                
+                if (!empty(\Idno\Core\Idno::site()->config()->capture_logs) && \Idno\Core\Idno::site()->config()->capture_logs) { 
+                    site()->addPageHandler('/admin/logs/?', '\Idno\Pages\Admin\Logs');
+                }
+            }
+           
+            /**
+             * Retrieve users by admins.
+             * @param type $limit
+             * @param type $offset
+             * @return type
+             */
+            static function getAdmins($limit = 10, $offset)
+            {
+                return \Idno\Entities\User::get(['admin' => true], [], $limit, $offset);
             }
 
         }

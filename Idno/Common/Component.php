@@ -17,6 +17,7 @@
                 $this->init();
                 $this->registerEventHooks();
                 $this->registerPages();
+                $this->registerTranslations();
             }
 
             /**
@@ -50,6 +51,13 @@
              */
             function registerPages()
             {
+            }
+            
+            /**
+             * Register any translation strings or language files for the current language.
+             */
+            function registerTranslations() 
+            {   
             }
 
             /**
@@ -124,6 +132,21 @@
                 $reflector = new \ReflectionClass(get_class($this));
 
                 return $reflector->getNamespaceName();
+            }
+
+            /**
+             * Gets the name of this class including its namespace
+             * @param bool $convert_slashes If set to true, converts \ slashes to / (false by default)
+             * @return string
+             */
+            function getFullClassName($convert_slashes = false)
+            {
+                $return = get_class($this);
+                if ($convert_slashes) {
+                    $return = str_replace('\\', '/', $return);
+                }
+
+                return $return;
             }
 
         }

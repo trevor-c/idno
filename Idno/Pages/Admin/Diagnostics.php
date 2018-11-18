@@ -11,6 +11,7 @@
 
             function getContent()
             {
+                $this->setNoCache();
                 $this->adminGatekeeper(); // Admins only
 
                 // Generate basic diagnostics for report
@@ -19,8 +20,8 @@
                 // Create diagnostics report
                 if ($this->xhr) {
 
-                    $report = "Known Diagnostics: Version " . \Idno\Core\site()->version() . "\nDate: " . date('r') . "\n\n";
-                    $report .= "*** WARNING: This report contains sensitive information. Be careful about who and how you transmit it. ***\n\n";
+                    $report = "Known Diagnostics: Version " . \Idno\Core\Version::version() . ' (' . \Idno\Core\Version::build() . ") \nDate: " . date('r') . "\n\n";
+                    $report .= "*** WARNING: This report contains sensitive information. Be careful about how you transmit it, and to whom. ***\n\n";
                     $report .= "Basics:\n-------\n\n";
 
                     if ($basics['status'] != 'Ok') {
@@ -35,21 +36,22 @@
                         $report .= "Basic checks on installation discovered no problems.\n\n";
                     }
 
-                    $config                       = \Idno\Core\site()->config();
+                    $config                       = \Idno\Core\Idno::site()->config();
                     $config->config['dbpass']     = '** REDACTED **';
                     $config->ini_config['dbpass'] = '** REDACTED **';
+                    $config->config['site_secret']     = '** REDACTED **';
 
-                    $report .= "Running config:\n---------------\n" . var_export($config, true) . "\n\n";
+                    $report .= "\nRunning config:\n---------------\n" . var_export($config, true) . "\n\n";
                     $report .= "\$_SESSION:\n----------\n" . var_export($_SESSION, true) . "\n\n";
                     $report .= "\$_SERVER:\n---------\n" . var_export($_SERVER, true) . "\n\n";
 
                     // Hook so other plugins and subsystems can add their own data to the report.
-                    $report = \Idno\Core\site()->triggerEvent('diagnostics/generate', [], $report);
+                    $report = \Idno\Core\Idno::site()->triggerEvent('diagnostics/report', [], $report);
 
                     echo $report;
                     exit;
                 } else {
-                    $t        = \Idno\Core\site()->template();
+                    $t        = \Idno\Core\Idno::site()->template();
                     $t->body  = $t->__(['basics' => $basics])->draw('admin/diagnostics');
                     $t->title = 'Diagnostics';
                     $t->drawPage();
@@ -66,10 +68,25 @@
                     'report' => [],
                 ];
 
-                // Check PHP version (sometimes install can be
-                if (version_compare(phpversion(), '5.4') >= 0) {
+                // Check SSL
+                if (!\Idno\Core\Idno::site()->currentPage()->isSSL()) {
+                    $basics['status']             = 'Failure';
+                    $basics['report']['security'] = [
+                        'status'  => 'Warning',
+                        'message' => 'Your site doesn\'t seem to be loaded with HTTPS. We strongly recommend using HTTPS to make your site secure and protect your privacy.'
+                    ];
+                }
+
+                // Check PHP version 
+                if (version_compare(phpversion(), '7.0') >= 0) {
                     $basics['report']['php-version'] = [
                         'status' => 'Ok'
+                    ];
+                } else if (version_compare(phpversion(), '5.6') >= 0) {
+                    $basics['status']             = 'Failure';
+                    $basics['report']['php-version'] = [
+                        'status'  => 'Warning',
+                        'message' => 'You are running Known using a very old version of PHP (' . phpversion() . '), which is no longer actively supported. Although Known will currently still install, some features may not work, so you should upgrade soon. You may need to ask your server administrator to upgrade PHP for you.'
                     ];
                 } else {
                     $basics['report']['php-version'] = [
@@ -81,7 +98,7 @@
 
                 // Check installed extensions
                 $basics['report']['php-extensions'] = ['status' => 'Ok', 'message' => 'PHP Extension(s): '];
-                foreach (['curl', 'date', 'dom', 'gd', 'json', 'libxml', 'mbstring', 'mysql', 'reflection', 'session', 'simplexml', 'openssl'] as $extension) {
+                foreach (['curl', 'date', 'dom', 'gd', 'json', 'libxml', 'mbstring', 'pdo', 'reflection', 'session', 'simplexml', 'openssl'] as $extension) {
                     if (!extension_loaded($extension)) {
                         $basics['report']['php-extensions']['message'] .= "$extension, ";
                         $basics['report']['php-extensions']['status'] = 'Failure';
@@ -91,8 +108,8 @@
                 $basics['report']['php-extensions']['message'] = trim($basics['report']['php-extensions']['message'], ' ,') . ' missing.';
 
                 // Check upload directory (if set)
-                $basics['report']['upload-path'] = ['status' => 'Ok'];
-                $upload_path                     = \Idno\Core\site()->config()->uploadpath;
+                $basics['report']['upload-path'] = ['status' => 'Ok', 'message' => ''];
+                $upload_path                     = \Idno\Core\Idno::site()->config()->uploadpath;
                 if (!empty($upload_path)) {
                     if ($upload_path = realpath($upload_path)) {
                         if (substr($upload_path, -1) != '/' && substr($upload_path, -1) != '\\') {
@@ -121,14 +138,14 @@
                     }
                 } else {
                     // We don't have an upload path set, do we need one?
-                    if (\Idno\Core\site()->config()->filesystem == 'local') {
+                    if (\Idno\Core\Idno::site()->config()->filesystem == 'local') {
                         $basics['status'] = 'Failure';
                         $basics['report']['upload-path']['message'] .= "Your file system is set to 'local' but you have not specified an upload path (uploadpath = ...;) in your config.ini";
                         $basics['report']['upload-path']['status'] = 'Failure';
                     }
                 }
 
-                return $basics;
+                return \Idno\Core\Idno::site()->triggerEvent('diagnostics/basics', [], $basics);;
             }
 
         }

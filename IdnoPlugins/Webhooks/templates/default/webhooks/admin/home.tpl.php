@@ -33,8 +33,9 @@
 
             <?php
 
-                if (!empty(\Idno\Core\site()->config()->webhook_syndication)) {
-                    foreach(\Idno\Core\site()->config()->webhook_syndication as $webhook) {
+                if (!empty(\Idno\Core\Idno::site()->config()->webhook_syndication)) {
+                    foreach(\Idno\Core\Idno::site()->config()->webhook_syndication as $webhook) {
+                        if (!empty($webhook['title']) && !empty($webhook['url'])) {
 
 ?>
 				<div class="row">
@@ -45,10 +46,11 @@
                         <input type="text" name="webhooks[]" value="<?=htmlspecialchars($webhook['url'])?>" placeholder="Webhook URL" class="form-control">
 					</div>
 					<div class="col-md-3" style="margin-top: 0.75em">
-                        <small><a href="#" onclick="$(this).closest('p').remove(); return false;"><i class="fa fa-times"></i> Remove this Webhook</a></small>
+                        <small><a href="#" onclick="$(this).closest('.row').remove(); return false;"><i class="fa fa-times"></i> Remove this Webhook</a></small>
 					</div>
 				</div>
 <?php
+                        }
 
                     }
                 }
@@ -62,7 +64,7 @@
 	                <input type="text" value="" name="webhooks[]" placeholder="Webhook URL" class="form-control">
 				</div>
 				<div class="col-md-3" style="margin-top: 0.75em">
-	                <small><a href="#" onclick="$(this).closest('p').remove(); return false;"><i class="fa fa-times"></i> Remove this Webhook</a></small>
+	                <small><a href="#" onclick="$(this).closest('.row').remove(); return false;"><i class="fa fa-times"></i> Remove this Webhook</a></small>
 	        	</div>
             </div>
             <div id="morefields"></div>
@@ -71,7 +73,7 @@
 	            	<a href="#" onclick="$('#morefields').append($('#field_template').html());"><i class="fa fa-plus"></i> Add another Webhook</a>
 	            </p>
             <p>
-                <?= \Idno\Core\site()->actions()->signForm('/admin/webhooks/') ?>
+                <?= \Idno\Core\Idno::site()->actions()->signForm('/admin/webhooks/') ?>
                 <input class="btn btn-primary" value="Save Webhooks" type="submit">
             </p>
 

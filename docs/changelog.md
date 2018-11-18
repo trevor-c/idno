@@ -2,6 +2,111 @@
 
 Starting with version 0.6.4, this is a list of changes in the self-hosted, open source version of Known.
 
+0.9.9
+-----
+May 15, 2017
+
+* A simpler user registration experience
+* Fixed image preview rotation
+* Removed Convoy
+* Improved indieweb support
+* Improved migration support
+* Advanced access control internal API
+* Design and layout fixes
+* Better error pages
+* Support for PHP 7
+* Deprecated support for MongoDB
+* Countless fixes and speed improvements in the background
+
+0.9.2
+-----
+April 23, 2016
+
+* Any theme can be single or multi-user
+* Improved UI when replying to tweets
+* Improved support for non-Latin URLs
+* Better audio UI
+* Support "delete" webmentions
+* Improved support for receiving indieweb RSVPs
+* Database speed and efficiency enhancements
+* Better support for embedding YouTube videos
+* Numerous back-end fixes and improvements
+
+0.9.1
+-----
+February 20, 2016
+
+* Notifications
+* Improved webmention support
+* Improved RSS feed import
+* Pubsubhubbub now pings the homepage
+* Improved MongoDB compatibility
+* Fixed a bug with some hashtag links
+* Fixed an issue with APC caching detection
+* Logging interface is now PSR-3 compatible
+
+0.9.0.4
+-------
+February 6, 2016
+
+* Improved user registration page and onboarding flow
+* Cleaned up some text pages
+* Fixed an issue where you couldn't change back to the default theme
+* Fixed a compatibility issue with Photos on PHP 5.4
+* Removed an EXIF error message
+* Retroactive POSSE
+* MongoDB fix for newer MongoDB versions
+* Updated diagnostics
+* Ability to shush notifications from certain domains
+* Minor default theme style changes
+
+0.9
+---
+February 2, 2016
+
+* Significantly faster performance
+* Twitter card support
+* Support for non-Latin characters in post URLs and hashtags
+* Character count in status updates is now safe for Twitter URLs
+* Choose between a number of permalink URL styles
+* Export RSS for import into WordPress
+* Import WordPress comments
+* Improved search
+* Improved autosave
+* Improved bookmarks and bookmarklet
+* Improved indiepub and webmention functionality
+* Improved notifications
+* Navigation style fixes
+* Reliability improvements when posting long pieces
+* Fixed an issue where pressing "cancel" could close the window
+* Syndicated photos no longer list "untitled" in syndicated version when title is not set
+
+0.8.5
+-----
+October 13, 2015
+
+* Experimental AMP support! See http://ampproject.org for more details
+* Better support for embedded content
+* A slew of indieweb improvements, including upgraded micropub support for actions like likes and reshares
+* A command line tool (with extensible plugin interface) to automatically create a config.ini file, among other things
+* Themes now take template precedence over plugins - so a theme can create a new style for a plugin-provided feature
+* Known now works better under FastCGI on some shared hosts
+* Lots of API fixes and consistency changes under the hood
+
+0.8.4
+-----
+September 28, 2015
+
+* See who you've invited to Known, and resend or rescind invitations
+* Hashtag linking improvements
+* Added support for SIP, Bitcoin and Spotify profile fields
+* SVG upload support
+* Numerous interface improvements
+* Fixed aggressive caching of Known posts
+* Assorted API fixes and improvements
+* Introduced HTML purifier component
+* Webmentions no longer strip HTML
+
 0.8.3.1
 -------
 August 19, 2015

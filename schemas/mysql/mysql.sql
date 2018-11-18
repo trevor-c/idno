@@ -13,11 +13,13 @@ CREATE TABLE IF NOT EXISTS `config` (
   `entity_subtype` varchar(64) NOT NULL,
   `created` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `contents` longblob NOT NULL,
-  `search` text NOT NULL,
+  `search` longtext NOT NULL,
+  `publish_status` varchar(255) NOT NULL DEFAULT 'published',
   PRIMARY KEY (`uuid`),
   KEY `owner` (`owner`,`created`),
   KEY `_id` (`_id`),
-  KEY `entity_subtype` (`entity_subtype`)
+  KEY `entity_subtype` (`entity_subtype`),
+  KEY `publish_status` (`publish_status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 -- --------------------------------------------------------
@@ -33,11 +35,13 @@ CREATE TABLE IF NOT EXISTS `entities` (
   `entity_subtype` varchar(64) NOT NULL,
   `created` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `contents` longblob NOT NULL,
-  `search` text NOT NULL,
+  `search` longtext NOT NULL,
+  `publish_status` varchar(255) NOT NULL DEFAULT 'published',
   PRIMARY KEY (`uuid`),
   UNIQUE KEY `_id` (`_id`),
   KEY `owner` (`owner`,`created`),
   KEY `entity_subtype` (`entity_subtype`),
+  KEY `publish_status` (`publish_status`),
   FULLTEXT KEY `search` (`search`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
@@ -53,12 +57,14 @@ CREATE TABLE IF NOT EXISTS `reader` (
   `owner` varchar(255) NOT NULL,
   `entity_subtype` varchar(64) NOT NULL,
   `created` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `contents` blob NOT NULL,
-  `search` text NOT NULL,
+  `contents` longblob NOT NULL,
+  `search` longtext NOT NULL,
+  `publish_status` varchar(255) NOT NULL DEFAULT 'published',
   PRIMARY KEY (`uuid`),
   UNIQUE KEY `_id` (`_id`),
   KEY `owner` (`owner`,`created`),
   KEY `entity_subtype` (`entity_subtype`),
+  KEY `publish_status` (`publish_status`),
   FULLTEXT KEY `search` (`search`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
@@ -72,7 +78,7 @@ CREATE TABLE IF NOT EXISTS `metadata` (
   `entity` varchar(255) NOT NULL,
   `_id` varchar(32) NOT NULL,
   `collection` varchar(64) NOT NULL,
-  `name` varchar(32) NOT NULL,
+  `name` varchar(64) NOT NULL,
   `value` text NOT NULL,
   KEY `entity` (`entity`,`name`),
   KEY `value` (`value`(255)),
@@ -104,4 +110,4 @@ CREATE TABLE IF NOT EXISTS `session` (
     PRIMARY KEY (`session_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
-REPLACE INTO `versions` VALUES('schema', '2014100801');
+REPLACE INTO `versions` VALUES('schema', '2017032001');

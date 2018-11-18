@@ -15,7 +15,7 @@
             <div class="col-md-3">
                 <div class="text-center">
 
-                    <div id="photo-preview"><img src="<?= \Idno\Core\site()->session()->currentUser()->getIcon() ?>"
+                    <div id="photo-preview"><img src="<?= \Idno\Core\Idno::site()->session()->currentUser()->getIcon() ?>"
                                                  class="avatar img-circle"
                                                  alt="avatar" style="width: 100px"></div>
 
@@ -24,7 +24,8 @@
                         <span id="photo-filename">Select a user picture</span>
                             <input type="file" name="avatar" id="photo"
                                    class="form-control"
-                                   accept="image/*;capture=camera"
+                                   accept="image/*"
+                                   capture="camera"
                                    onchange="photoPreview(this)"/>
 
                         </span>
@@ -40,11 +41,11 @@
                            value="<?= htmlspecialchars($vars['user']->getTitle()) ?>">
                 </div>
 
-                <div class="form-group">
+                <!--<div class="form-group">
                     <label class="control-label" for="tagline">Short description</label>
                     <input class="form-control" type="text" id="tagline" name="profile[tagline]"
                            value="<?= htmlspecialchars($vars['user']->getShortDescription()) ?>">
-                </div>
+                </div>-->
 
                 <div class="form-group">
                     <label class="control-label" for="body">About you</label><br>
@@ -73,7 +74,7 @@
                                 foreach ($urls as $url) {
                                     if (!empty($url)) {
                                         ?>
-                                        <div class="row">
+                                        <div class="form-group">
                                             <div class="col-md-10"><input type="text" name="profile[url][]" id="website"
                                                                           value="<?= htmlspecialchars($this->fixURL($url)) ?>"
                                                                           placeholder="http://" class="form-control"/>
@@ -110,7 +111,7 @@
 
                 <div class="form-group">
                     <p>
-                        <?= \Idno\Core\site()->actions()->signForm('/profile/' . $vars['user']->getHandle()) ?>
+                        <?= \Idno\Core\Idno::site()->actions()->signForm('/profile/' . $vars['user']->getHandle()) ?>
                         <input type="button" class="btn btn-cancel" value="Cancel" onclick="hideContentCreateForm();"/>
                         <input type="submit" class="btn btn-primary" value="Save Changes"/>
                     </p>

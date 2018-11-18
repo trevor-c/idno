@@ -18,12 +18,16 @@
              */
             function __construct()
             {
-                $this->members = array(
-                    'read'  => array(\Idno\Core\site()->session()->currentUser()->getUUID()),
-                    'write' => array(\Idno\Core\site()->session()->currentUser()->getUUID()),
-                    'admin' => array(\Idno\Core\site()->session()->currentUser()->getUUID())
-                );
-
+                if (\Idno\Core\Idno::site()->session()->currentUser()) {
+                    $this->read  = array(\Idno\Core\Idno::site()->session()->currentUser()->getUUID());
+                    $this->write = array(\Idno\Core\Idno::site()->session()->currentUser()->getUUID());
+                    $this->admin = array(\Idno\Core\Idno::site()->session()->currentUser()->getUUID());
+                } else {
+                    $this->read  = [];
+                    $this->write = [];
+                    $this->admin = [];
+                }
+               
                 return parent::__construct();
             }
 
@@ -36,7 +40,7 @@
              */
             function canRead($user_id = '')
             {
-                if (empty($user_id)) $user_id = \Idno\Core\site()->session()->currentUser()->uuid;
+                if (empty($user_id)) $user_id = \Idno\Core\Idno::site()->session()->currentUser()->uuid;
                 if ($this->getOwnerID() == $user_id) return true;
                 if ($this->isMember($user_id)) return true;
                 if ($this->access == 'PUBLIC') return true;
@@ -53,8 +57,8 @@
              */
             function isMember($user_id = '', $access = 'read')
             {
-                if (empty($user_id)) $user_id = \Idno\Core\site()->session()->currentUser()->uuid;
-                if (!empty($this->members[$access]) && is_array($this->members[$access]) && array_search($user_id, $this->members[$access])) {
+                if (empty($user_id)) $user_id = \Idno\Core\Idno::site()->session()->currentUser()->uuid;
+                if (!empty($this->$access) && is_array($this->$access) && (array_search($user_id, $this->$access) !== false)) {
                     return true;
                 }
 
@@ -70,7 +74,7 @@
              */
             function canPublish($user_id = '')
             {
-                if (empty($user_id)) $user_id = \Idno\Core\site()->session()->currentUser()->uuid;
+                if (empty($user_id)) $user_id = \Idno\Core\Idno::site()->session()->currentUser()->uuid;
                 if ($this->getOwnerID() == $user_id) return true;
                 if ($this->isMember($user_id, 'write')) return true;
 
@@ -85,14 +89,14 @@
              */
             function addMember($user_id, $access = 'read')
             {
-                if ($this->canEdit()) {
-                    if (($user = \Idno\Core\site()->db()->getObject($user_id)) && ($user instanceof User)) {
-                        $this->members[$access][] = $user_id;
-
-                        return true;
+                if (($user = \Idno\Core\Idno::site()->db()->getObject($user_id)) && ($user instanceof User)) {
+                    if (!$this->isMember($user_id, $access)) {
+                        array_push($this->$access, $user_id);
+                        $this->$access = array_unique($this->$access);
                     }
-                }
 
+                    return true;
+                }
                 return false;
             }
 
@@ -105,7 +109,7 @@
              */
             function canEdit($user_id = '')
             {
-                if (empty($user_id)) $user_id = \Idno\Core\site()->session()->currentUser()->uuid;
+                if (empty($user_id)) $user_id = \Idno\Core\Idno::site()->session()->currentUser()->uuid;
                 if ($this->getOwnerID() == $user_id) return true;
                 if ($this->isMember($user_id, 'admin')) return true;
 
@@ -120,12 +124,35 @@
              */
             function removeMember($user_id, $access = 'read')
             {
-                if (!empty($this->members) && is_array($this->members) && $key = array_search($user_id, $this->members)) {
-                    unset($this->members[$access][$key]);
+                $key = array_search($user_id, $this->$access);
+
+                if (!empty($this->$access) && is_array($this->$access) && $key !== false) {
+                    array_splice($this->$access, $key, 1);
 
                     return true;
                 }
 
+                return false;
+            }
+            
+            /**
+             * Get entities by access group.
+             * @param mixed $access_group
+             * @param type $search
+             * @param type $fields
+             * @param type $limit
+             * @param type $offset
+             * @return boolean
+             */
+            static function getByAccessGroup($access_group, $search = array(), $fields = array(), $limit = 10, $offset = 0)
+            {
+                if (!empty($access_group)) {
+                    
+                    $search = array_merge($search, ['access' => $access_group]);
+
+                    return \Idno\Core\Idno::site()->db()->getObjects('', $search, $fields, $limit, $offset, static::$retrieve_collection);
+                }
+                
                 return false;
             }
 

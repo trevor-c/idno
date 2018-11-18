@@ -47,7 +47,7 @@
         </div>
     
         <div id="diagnostics-report" style="display: none;">
-            <small><pre>
+            <small><pre style="overflow: auto; height: 500px;">
                 </pre></small>
         </div>
 
@@ -62,7 +62,7 @@
         $('#diagnostics-report-run').click(function(){
             $(this).html("Generating...").attr('disabled', 'true');
             
-            $('#diagnostics-report pre').load('<?= \Idno\Core\site()->currentPage()->currentUrl(); ?>', function(){
+            $('#diagnostics-report pre').load('<?= \Idno\Core\Idno::site()->currentPage()->currentUrl(); ?>', function(){
                 $('#diagnostics-report-run').hide();
                 $('#diagnostics-report').fadeIn();
             });

@@ -13,7 +13,7 @@
         use Idno\Core\Email;
 
         // We need the PHP 5.5 password API
-        require_once \Idno\Core\site()->config()->path . '/external/password_compat/lib/password.php';
+        require_once \Idno\Core\Idno::site()->config()->path . '/external/password_compat/lib/password.php';
 
         class User extends \Idno\Common\Entity implements \JsonSerializable
         {
@@ -38,7 +38,7 @@
             {
 
                 // Hook to add user data to webfinger
-                \Idno\Core\site()->addEventHook('webfinger', function (\Idno\Core\Event $event) {
+                \Idno\Core\Idno::site()->addEventHook('webfinger', function (\Idno\Core\Event $event) {
 
                     $eventdata = $event->data();
                     $user      = $eventdata['object'];
@@ -64,15 +64,15 @@
                 });
 
                 // Refresh session user whenever it is saved
-                \Idno\Core\site()->addEventHook('saved', function (\Idno\Core\Event $event) {
+                \Idno\Core\Idno::site()->addEventHook('saved', function (\Idno\Core\Event $event) {
 
                     $eventdata = $event->data();
                     $user      = $eventdata['object'];
 
                     if ($user instanceof User) {
-                        if ($currentUser = \Idno\Core\site()->session()->currentUser()) {
+                        if ($currentUser = \Idno\Core\Idno::site()->session()->currentUser()) {
                             if ($user->getUUID() == $currentUser->getUUID()) {
-                                \Idno\Core\site()->session()->refreshSessionUser($user);
+                                \Idno\Core\Idno::site()->session()->refreshSessionUser($user);
                             }
                         }
                     }
@@ -80,37 +80,37 @@
                 });
 
                 // Email notifications
-                \Idno\Core\site()->addEventHook('notify', function (\Idno\Core\Event $event) {
+                \Idno\Core\Idno::site()->addEventHook('notify', function (\Idno\Core\Event $event) {
 
-                    $eventdata = $event->data();
-                    $user      = $eventdata['user'];
+                    $eventdata    = $event->data();
+                    $user         = $eventdata['user'];
+                    $notification = $eventdata['notification'];
 
-                    $eventdata = $event->data();
-                    if ($user instanceof User && $context = $eventdata['context']) {
+                    if ($user instanceof User && !defined('KNOWN_UNIT_TEST')) {
 
-                        if (empty($user->notifications['email']) || $user->notifications['email'] == 'all' || ($user->notifications['email'] == 'comment' && in_array($context, array('comment', 'reply')))) {
+                        if (empty($user->notifications['email']) || $user->notifications['email'] == 'all' || ($user->notifications['email'] == 'comment' && in_array($notification->type, array('comment', 'reply')))) {
 
-                            $eventdata = $event->data();
-                            $vars      = $eventdata['vars'];
-                            if (empty($vars)) {
-                                $vars = array();
-                            }
-                            $eventdata      = $event->data();
-                            $vars['object'] = $eventdata['object'];
-
-                            if (filter_var($user->email, FILTER_VALIDATE_EMAIL)) {
-                                $email = new Email();
-                                $email->setSubject($eventdata['message']);
-                                $email->setHTMLBodyFromTemplate($eventdata['message_template'], $vars);
-                                $email->setTextBodyFromTemplate($eventdata['message_template'], $vars);
-                                $email->addTo($user->email);
-                                $email->send();
+                            if (($obj = $notification->getObject()) && isset($obj['permalink'])) {
+                                $permalink = $obj['permalink'];
                             }
 
+                            if (empty($user->notifications['ignored_domains']) || empty($permalink) || !in_array(parse_url($permalink, PHP_URL_HOST), $user->notifications['ignored_domains'])) {
+                                if (filter_var($user->email, FILTER_VALIDATE_EMAIL)) {
+                                    $vars = [
+                                        'user'         => $user,
+                                        'notification' => $notification,
+                                    ];
+
+                                    $email = new Email();
+                                    $email->setSubject($notification->getMessage());
+                                    $email->setHTMLBodyFromTemplate($notification->getMessageTemplate(), $vars);
+                                    $email->setTextBodyFromTemplate($notification->getMessageTemplate(), $vars);
+                                    $email->addTo($user->email);
+                                    $email->send();
+                                }
+                            }
                         }
-
                     }
-
                 });
 
             }
@@ -123,7 +123,7 @@
              */
             function getIcon()
             {
-                $response = \Idno\Core\site()->triggerEvent('icon', array('object' => $this));
+                $response = \Idno\Core\Idno::site()->triggerEvent('icon', array('object' => $this));
                 if (!empty($response) && $response !== true) {
                     return $response;
                 }
@@ -131,10 +131,10 @@
                     return $this->image;
                 }
                 if (!empty($this->icon)) {
-                    return \Idno\Core\site()->config()->getDisplayURL() . 'file/' . $this->icon;
+                    return \Idno\Core\Idno::site()->config()->getDisplayURL() . 'file/' . $this->icon;
                 }
 
-                return \Idno\Core\site()->template()->__(array('user' => $this))->draw('entity/User/icon');
+                return \Idno\Core\Idno::site()->template()->__(array('user' => $this))->draw('entity/User/icon');
             }
 
             /**
@@ -165,7 +165,7 @@
                     return $this->url;
                 }
 
-                return \Idno\Core\site()->config()->getDisplayURL() . 'profile/' . $this->getHandle();
+                return \Idno\Core\Idno::site()->config()->getDisplayURL() . 'profile/' . $this->getHandle();
             }
 
             /**
@@ -194,7 +194,7 @@
              */
             static function getByEmail($email)
             {
-                if ($result = \Idno\Core\site()->db()->getObjects(get_called_class(), array('email' => $email), null, 1)) {
+                if ($result = \Idno\Core\Idno::site()->db()->getObjects(get_called_class(), array('email' => $email), null, 1)) {
                     foreach ($result as $row) {
                         return $row;
                     }
@@ -243,12 +243,13 @@
                 }
 
                 if (!empty($tagline)) {
-                    $description = strip_tags($tagline);
+                    $description       = strip_tags($tagline);
                     $description_words = explode(' ', $description);
-                    $description = implode(' ', array_slice($description_words, 0, $words));
+                    $description       = implode(' ', array_slice($description_words, 0, $words));
                     if (sizeof($description_words) > $words) {
                         $description .= ' ...';
                     }
+
                     return $description;
                 }
 
@@ -281,7 +282,7 @@
              */
             static function getByHandle($handle)
             {
-                if ($result = \Idno\Core\site()->db()->getObjects(get_called_class(), array('handle' => $handle), null, 1)) {
+                if ($result = \Idno\Core\Idno::site()->db()->getObjects(get_called_class(), array('handle' => $handle), null, 1)) {
                     foreach ($result as $row) {
                         return $row;
                     }
@@ -298,13 +299,13 @@
             static function getByProfileURL($url)
             {
                 // If user explicitly has a profile url set (generally this means it's a RemoteUser class
-                if ($result = \Idno\Core\site()->db()->getObjects(get_called_class(), array('url' => $url), null, 1)) {
+                if ($result = \Idno\Core\Idno::site()->db()->getObjects(get_called_class(), array('url' => $url), null, 1)) {
                     foreach ($result as $row) {
                         return $row;
                     }
                 }
                 // Ok, now try and see if we can get the local profile
-                if (preg_match("~" . \Idno\Core\site()->config()->url . 'profile/([A-Za-z0-9]+)?~', $url, $matches))
+                if (preg_match("~" . \Idno\Core\Idno::site()->config()->url . 'profile/([A-Za-z0-9]+)?~', $url, $matches))
                     return \Idno\Entities\User::getByHandle($matches[1]);
 
                 // Can't find
@@ -332,8 +333,8 @@
             function generateAPIkey()
             {
                 $token = new \Idno\Core\TokenProvider();
-                
-                $apikey       = strtolower(substr(base64_encode($token->generateToken(32)), 12, 16));
+
+                $apikey       = strtolower(base64_encode($token->generateToken(24)));
                 $this->apikey = $apikey;
                 $this->save();
 
@@ -346,6 +347,7 @@
              */
             function isAdmin()
             {
+                if (\Idno\Core\Idno::site()->session()->isAPIRequest()) return false; // Refs #831 - limit admin access on API
                 if (!empty($this->admin)) return true;
 
                 return false;
@@ -365,12 +367,36 @@
             }
 
             /**
+             * Can a specified user (either an explicitly specified user ID
+             * or the currently logged-in user if this is left blank) edit
+             * this user?
+             *
+             * @param string $user_id
+             * @return true|false
+             */
+
+            function canEdit($user_id = '')
+            {
+
+                if (!parent::canEdit($user_id)) return false;
+
+                if (empty($user_id)) {
+                    $user_id = \Idno\Core\Idno::site()->session()->currentUserUUID();
+                }
+
+                if ($user_id == $this->getUUID()) return true;
+
+                return \Idno\Core\Idno::site()->triggerEvent('canEdit/user', ['object' => $this, 'user_id' => $user_id], false);
+
+            }
+
+            /**
              * Retrieve the URL required to edit this user
              * @return string
              */
             function getEditURL()
             {
-                return \Idno\Core\site()->config()->url . 'profile/' . $this->getHandle() . '/edit';
+                return \Idno\Core\Idno::site()->config()->url . 'profile/' . $this->getHandle() . '/edit';
             }
 
             /**
@@ -417,7 +443,7 @@
                     $default = true;
                 }
 
-                return \Idno\Core\site()->triggerEvent('user/password/checkstrength', array(
+                return \Idno\Core\Idno::site()->triggerEvent('user/password/checkstrength', array(
                     'password' => $password
                 ), $default);
 
@@ -444,7 +470,9 @@
              */
             function addPasswordRecoveryCode()
             {
-                $auth_code                         = md5(time() . rand(0, 9999) . $this->email);
+                $token = new \Idno\Core\TokenProvider();
+
+                $auth_code                         = bin2hex($token->generateToken(16));
                 $this->password_recovery_code      = $auth_code;
                 $this->password_recovery_code_time = time();
 
@@ -482,7 +510,8 @@
              */
             function countPosts()
             {
-                return \Idno\Entities\ActivityStreamPost::countFromX('Idno\Entities\ActivityStreamPost', array('owner' => $this->getUUID()));
+                $types = \Idno\Common\ContentType::getRegisteredClasses();
+                return \Idno\Common\Entity::countFromX($types, array('owner' => $this->getUUID()));
             }
 
             /**
@@ -515,7 +544,7 @@
                         $acl->addMember($user->getUUID());
                         $acl->save();
 
-                        \Idno\Core\site()->triggerEvent('follow', array('user' => $this, 'following' => $user));
+                        \Idno\Core\Idno::site()->triggerEvent('follow', array('user' => $this, 'following' => $user));
 
                         return true;
                     }
@@ -575,7 +604,7 @@
                         $acl->save();
                     }
 
-                    \Idno\Core\site()->triggerEvent('unfollow', array('user' => $this, 'following' => $user));
+                    \Idno\Core\Idno::site()->triggerEvent('unfollow', array('user' => $this, 'following' => $user));
 
                     return true;
                 }
@@ -638,11 +667,11 @@
             function getXAccessGroups($permission)
             {
                 $return = array('PUBLIC', 'SITE', $this->getUUID());
-                if ($groups = \Idno\Core\site()->db()->getObjects('Idno\\Entities\\AccessGroup', array('members.' . $permission => $this->getUUID()), null, PHP_INT_MAX, 0)) {
+                if ($groups = \Idno\Core\Idno::site()->db()->getObjects('Idno\\Entities\\AccessGroup', array('members.' . $permission => $this->getUUID()), null, PHP_INT_MAX, 0)) {
                     $return = array_merge($return, $groups);
                 }
 
-                return $return;
+                return \Idno\Core\Idno::site()->triggerEvent("permission:$permission:entities", ['user' => $this], $return);
             }
 
             /**
@@ -678,10 +707,10 @@
             function getXAccessGroupIDs($permission)
             {
                 $return = array('PUBLIC', 'SITE', $this->getUUID());
-                if ($groups = \Idno\Core\site()->db()->getRecords(array('uuid' => true),
+                if ($groups = \Idno\Core\Idno::site()->db()->getRecords(array('uuid' => true),
                     array(
                         'entity_subtype'         => 'Idno\\Entities\\AccessGroup',
-                        'members.' . $permission => $this->getUUID()),
+                        $permission => $this->getUUID()),
                     PHP_INT_MAX,
                     0)
                 ) {
@@ -690,7 +719,7 @@
                     }
                 }
 
-                return $return;
+                return \Idno\Core\Idno::site()->triggerEvent("permission:$permission:ids", ['user' => $this], $return);
             }
 
             /**
@@ -705,6 +734,62 @@
                 return $this->getXAccessGroupIDs('write');
             }
 
+            /**
+             * Does this user have the given permission.
+             * @param string $permission
+             */
+            function hasPermission($permission) {
+                $permissions = $this->permissions; 
+                if (empty($permissions)) {
+                    $permissions = [];
+                }
+                
+                $key = array_search($permission, $permissions); 
+                
+                if ($key!==false)
+                    return true;
+                
+                return false;
+            }
+            
+            /**
+             * Grant access to a specific permission.
+             * @param string $permission
+             */
+            function grantPermission($permission) {
+                
+                $permissions = $this->permissions;
+                if (empty($permissions)) {
+                    $permissions = [];
+                }
+                
+                $permissions[] = $permission;
+                
+                $this->permissions = array_unique($permissions);
+                
+                return $this->save();
+            }
+            
+            /**
+             * Revoke a given permission.
+             * @param type $permission
+             */
+            function revokePermission($permission) {
+                $permissions = $this->permissions;
+                if (empty($permissions)) {
+                    $permissions = [];
+                }
+                
+                $key = array_search($permission, $permissions);
+                if ($key !== false) {
+                    unset($permissions[$key]);
+                }
+                
+                $this->permissions = array_unique($permissions);
+                
+                return $this->save();
+            }
+            
             /**
              * Users are activity streams objects of type "person".
              *
@@ -760,24 +845,30 @@
             /**
              * Hook to provide a method of notifying a user - for example, sending an email or displaying a popup.
              *
-             * @param string $message The short text message to notify the user with. (eg, a subject line.)
-             * @param string $message_template Optionally, a template name pointing to a longer version of the message with more detail.
-             * @param string $context Optionally, a string describing the kind of action. eg, "comment", "like" or "reshare".
-             * @param array $vars Optionally, variables to pass to the template.
-             * @param \Idno\Common\Entity|null $object Optionally, an object to pass
-             * @param array|null $params Optionally, any parameters to pass to the process. NB: this should be used rarely.
+             * @param \Idno\Entities\Notification $notification
+             * @param \Idno\Common\Entity|null $object
              */
-            public function notify($message, $message_template = '', $vars = array(), $context = '', $object = null, $params = null)
+            public function notify($notification)
             {
-                return \Idno\Core\site()->triggerEvent('notify', array(
-                    'user'             => $this,
-                    'message'          => $message,
-                    'context'          => $context,
-                    'vars'             => $vars,
-                    'message_template' => $message_template,
-                    'object'           => $object,
-                    'parameters'       => $params
+                return \Idno\Core\Idno::site()->triggerEvent('notify', array(
+                    'user'         => $this,
+                    'notification' => $notification,
                 ));
+            }
+
+            /**
+             * Look up the number of unread notifications for this user
+             *
+             * @return integer
+             */
+            public function countUnreadNotifications()
+            {
+                $count = Notification::countFromX('Idno\Entities\Notification', [
+                    'owner' => $this->getUUID(),
+                    'read'  => false,
+                ]);
+
+                return $count;
             }
 
             /**
@@ -790,11 +881,11 @@
 
                 if (!$this->canEdit()) return false;
 
-                $profile = \Idno\Core\site()->currentPage()->getInput('profile');
+                $profile = \Idno\Core\Idno::site()->currentPage()->getInput('profile');
                 if (!empty($profile)) {
                     $this->profile = $profile;
                 }
-                if ($name = \Idno\Core\site()->currentPage()->getInput('name')) {
+                if ($name = \Idno\Core\Idno::site()->currentPage()->getInput('name')) {
                     $this->setName($name);
                 }
                 if (!empty($_FILES['avatar'])) {

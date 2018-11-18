@@ -12,7 +12,7 @@
 
 </div>
 
-<form id="bgform" action="<?= \Idno\Core\site()->config()->getDisplayURL() ?>admin/cherwell/" method="post"
+<form id="bgform" action="<?= \Idno\Core\Idno::site()->config()->getDisplayURL() ?>admin/cherwell/" method="post"
       enctype="multipart/form-data">
 
     <div class="row">
@@ -36,19 +36,19 @@
                     <span class="btn btn-primary btn-file">
                     <i class="fa fa-camera"></i>
                     <span id="photo-filename">Upload a new image</span>
-                    <input type="file" name="background" id="photo" class="col-md-9" accept="image/*;capture=camera"
+                    <input type="file" name="background" id="photo" class="col-md-9" accept="image/*" capture="camera"
                            onchange="photoPreview(this)"/>
                     </span>
                 </label>
             </p>
 
             <p>
-                <?= \Idno\Core\site()->actions()->signForm(\Idno\Core\site()->config()->getDisplayURL() . 'admin/cherwell/') ?>
+                <?= \Idno\Core\Idno::site()->actions()->signForm(\Idno\Core\Idno::site()->config()->getDisplayURL() . 'admin/cherwell/') ?>
                 <input type="submit" class="btn btn-primary" value="Save">
                 <input type="hidden" name="action" value="" id="action">
                 <?php
 
-                    if (!empty(\Idno\Core\site()->config->cherwell['bg_id'])) {
+                    if (!empty(\Idno\Core\Idno::site()->config->cherwell['bg_id'])) {
 
                         ?>
                         <input type="button" class="btn" value="Restore default image"
@@ -78,8 +78,8 @@
                                 ?>
                                 <option value="<?= $user->handle ?>" <?php
 
-                                    if (!empty(\Idno\Core\site()->config->cherwell['profile_user'])) {
-                                        if ($user->handle == \Idno\Core\site()->config->cherwell['profile_user']) {
+                                    if (!empty(\Idno\Core\Idno::site()->config->cherwell['profile_user'])) {
+                                        if ($user->handle == \Idno\Core\Idno::site()->config->cherwell['profile_user']) {
                                             echo 'selected';
                                         }
                                     }

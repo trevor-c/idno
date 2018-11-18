@@ -1,3 +1,11 @@
+/*
+ IMPORTANT:
+ This file isn't loaded directly, for changes to show you must generate a minified
+ version. E.g.
+
+    yui-compressor default.css > default.min.css
+*/    
+
 body {
     background-color: #fff;
     color: #333333;
@@ -22,9 +30,9 @@ a:hover, a:focus {
 	color: #af474f;
 }
 
-li {
+/*li {
     line-height: 1.8em !important;
-}
+}*/
 
 h1, h2, h3, h4, h5, h6 {
     font-weight: 400;
@@ -34,7 +42,7 @@ h2 {
     line-height: 1.3em;
 }
 
-.entry-content .p-name a {
+.idno-body .p-name a {
     font-size: 1.3em;
     margin: 0; padding: 0;
     color: #9f111b;
@@ -50,14 +58,14 @@ h2 {
     font-size: 1.2em;
 }
 
-.entry-content .photo-title a,
+.idno-body .photo-title a,
 .idno-posts h2.photo-title {
     font-size: 1.2em;
     margin: 0; padding: 0;
 }
 
-.entry-content .p-bookmark a,
-.idno-posts h2.p-bookmark {
+.idno-body .idno-bookmark a,
+.idno-posts h2.idno-bookmark {
     font-size: 1.4em;
     margin: 0; padding: 0;
 }
@@ -70,7 +78,7 @@ h1.p-profile, .p-profile a {
 	text-align: center;
 }
 
-.entry-content blockquote {
+.idno-body blockquote {
     margin-top: 2em;
     margin-bottom: 2em;
     font-size: 0.9em;
@@ -82,7 +90,7 @@ blockquote {
     padding: 0 0 0 15px;
 }
 
-.idno-statusupdates .entry-content p {
+.idno-statusupdates .idno-body p {
     font-size: 1.4em;
     margin: 0; padding: 0;
 }
@@ -225,7 +233,7 @@ span.contentTypeLogo:hover {
     line-height: 1.3em !important;
 }
 
-.idno-object .e-content blockquote p {
+.idno-object .idno-body blockquote p {
     font-size: 1.3em;
     line-height: 1.6em;
     margin-bottom: 1em;
@@ -274,12 +282,12 @@ h3.register {
 	padding-top: 20px;
 }
 
-.entry-content .photo-title a, .idno-posts h2.photo-title {
+.idno-body .photo-title a, .idno-posts h2.photo-title {
 	color: #9f111b;
 	font-size: 1.2em;
 }
 
-.entry-content .p-bookmark a, .idno-posts h2.p-bookmark {
+.idno-body .idno-bookmark a, .idno-posts h2.idno-bookmark {
 	color: #9f111b;
 	font-size: 1.2em;
 	font-family: "Helvetica Neue","Helvetica",Helvetica,Arial,sans-serif;
@@ -287,12 +295,12 @@ h3.register {
     padding: 0;
 }
 
-.idno-object .e-content {
+.idno-object .idno-body {
     font-size: 1.1em;
     line-height: 1.1em;
 }
 
-.e-content p {
+.idno-body p {
 	font-size: 1.3em;
 }
 
@@ -554,7 +562,7 @@ textarea, input[type="text"], input[type="password"], input[type="datetime"], in
     border-right: 5px solid rgba(0, 0, 0, 0);
 }
 
-.entry-content .p-name a {
+.idno-body .p-name a {
 	font-size: 1.0em;
 } 
 
@@ -566,7 +574,7 @@ textarea, input[type="text"], input[type="password"], input[type="datetime"], in
 	text-align: center;
 }
 
-.entry-content .h-geo a, .idno-posts h2.h-geo {
+.idno-body .h-geo a, .idno-posts h2.h-geo {
     color: #9f111b;
     font-size: 1.2em;
 }
@@ -638,8 +646,8 @@ textarea, input[type="text"], input[type="password"], input[type="datetime"], in
 
 .navbar-nav > li > .nav > li > a {
     color: #fff;
-    padding-bottom: 12px;
-    padding-top: 12px;
+    /*padding-bottom: 12px;
+    padding-top: 12px;*/
 }
 
 .navbar .nav .dropdown-toggle .caret {
@@ -689,11 +697,14 @@ textarea, input[type="text"], input[type="password"], input[type="datetime"], in
 	background-color:#9f111b;
 	border-color:#9f111b;
 }
-.entry-content .p-name a:hover, .entry-content .p-name a:focus {
+.idno-body .p-name a:hover, .idno-body .p-name a:focus {
     color: #af474f;
 }
 .jumbotron {
     background-color: #fff;
     border: 3px solid #9f111b;
+}
+.navbar-nav > li > .dropdown-menu, .navbar-right .dropdown-menu {
+    margin-top: 10px;
 }
 

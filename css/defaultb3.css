@@ -1,4 +1,12 @@
-/* CSS changes for Boostrap 3 migration */
+/* 
+CSS changes for Boostrap 3 migration 
+
+IMPORTANT:
+ This file isn't loaded directly, for changes to show you must generate a minified
+ version. E.g.
+
+    yui-compressor defaultb3.css > defaultb3.min.css
+*/
 .nav-tabs.nav > li > a {
 	color: #777777;
 	font-weight: 300;
@@ -10,22 +18,36 @@
 }
 
 .nav-tabs {
-    border-bottom: none;
+	border-bottom: medium none;
 }
 
 .nav-tabs > li.active > a, 
 .nav-tabs > li.active > a:focus, 
 .nav-tabs > li.active > a:hover {
-	border-color: none;
+    border-color: transparent;
     border-image: none;
-    border-style: none;
-    border-width: 0px;
+    border-width: 1px;
 }
 
 .nav-tabs > li.active > a {
 	color:#222222;
 	font-weight: 400;
-    margin-top: 1px;
+    /*margin-top: 1px;*/
+}
+
+.group-nav .nav {
+	padding-bottom: 8px;
+}
+
+.group-nav .nav-tabs {
+    border-bottom: 2px solid #ddd;
+}
+.group-nav .nav.nav-tabs li.active a,
+.group-nav .nav.nav-tabs li.focus a {
+	border-bottom: 2px solid #000;
+	padding-bottom: 6px;
+	padding-right: 0;
+	margin-right: 8px;
 }
 
 .nav-tabs > li > a:hover {
@@ -42,6 +64,7 @@
 .navbar {
 	box-shadow: 0 1px 10px rgba(0, 0, 0, 0.1);
 	border-radius: 0px;
+	border-bottom: 1px solid rgba(0, 0, 0, 0.15);
 }
 
 .navbar-default .navbar-brand {
@@ -63,12 +86,16 @@
 
 .navbar-nav > li > .nav > li > a {
     color: #333;
-    padding-bottom: 15px;
-    padding-top: 15px;
+   /* padding-bottom: 15px;
+    padding-top: 15px;*/
 }
 
 .navbar-nav > li > .nav > li > a:hover, .navbar-nav > li > .nav > li > a:focus  {
     color: #666;
+}
+.navbar-nav > li > a {
+	padding-bottom: 10px;
+	padding-top: 10px;
 }
 
 @media (min-width:837px) {
@@ -95,7 +122,8 @@
 }
 
 .control-label {
-	padding-top: 12px;
+	padding-top: 6px;
+	margin-bottom: 15px;
 }
 
 .controls-save {
@@ -114,23 +142,23 @@
 	.config-desc {
     	padding-top: 0px;
 	}
-	select, textarea, 
-	input[type="text"], 
-	input[type="password"], 
-	input[type="datetime"], 
-	input[type="datetime-local"], 
-	input[type="date"], 
-	input[type="month"], 
-	input[type="time"], 
-	input[type="week"], 
-	input[type="number"], 
-	input[type="email"], 
-	input[type="url"], 
-	input[type="tel"], 
-	input[type="color"], 
-	.uneditable-input {
-    	margin-bottom: 5px;
-    }
+}
+select, textarea, 
+input[type="text"], 
+input[type="password"], 
+input[type="datetime"], 
+input[type="datetime-local"], 
+input[type="date"], 
+input[type="month"], 
+input[type="time"], 
+input[type="week"], 
+input[type="number"], 
+input[type="email"], 
+input[type="url"], 
+input[type="tel"], 
+input[type="color"], 
+.uneditable-input {
+	margin-bottom: 5px;
 }
 .label {
 	font-weight: 500;
@@ -143,7 +171,7 @@ textarea.wysiwyg {
     height: 15em;
 }
 textarea.wysiwyg-short {
-    height: 4em !important;
+    /*height: 4em !important;*/
 }
 
 textarea.bodyInput {
@@ -362,6 +390,7 @@ select, input[type="file"] {
 }
 .dropdown-menu {
 	border-radius: 0px;
+	border-top: none;
 }
 .user-tbl img {
 	 width: 40px;
@@ -369,7 +398,6 @@ select, input[type="file"] {
 	 border-radius: 50%; 
 	 float: left; 
 	 margin-right: 15px; 
-	 margin-left: 0px; 
 	 margin-top: 3px; 
 	 margin-bottom: 16px;
 }
@@ -378,6 +406,25 @@ p.user-tbl {
 }
 .annotate-icon {
 	margin-left: 15px;
+}
+.navbar-default .navbar-nav > .open > a, .navbar-default .navbar-nav > .open > a:focus, .navbar-default .navbar-nav > .open > a:hover {
+	background-color: transparent;
+}
+.nav .open > a, .nav .open > a:focus, .nav .open > a:hover {
+	background-color: transparent;
+}
+.form-control.mentionable {
+	margin-bottom: 1em;
+}
+.edit-page-actions {
+	text-align: right;
+}
+.page-action {
+	padding-left: 2em;
+}
+.page-action [class^="fa fa-"], .page-action [class*=" fa fa-"] {
+    width: 1.5em;
+    text-align: left;
 }
 
 

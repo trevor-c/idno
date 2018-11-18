@@ -21,7 +21,7 @@ You can place the platform on your web host by:
 
 ### Use the automatic installer
 
-If you’re using a MySQL back-end, you can get started by pointing your browser at your Known site address. If you want to use MongoDB, you’ll need to create the configuration file manually, as described below.
+If you’re using a MySQL back-end, you can get started by pointing your browser at your Known site address. If you want to use MongoDB (or another database backend), you’ll need to create the configuration file manually, as described below.
 
 ### Use environment variables
 
@@ -32,20 +32,6 @@ If you’re using Docker or other virtualized server environments, you will need
     KNOWN_DBUSER = "KnownDBUser"
     KNOWN_DBPASS = "KnownDBPassword"
     KNOWN_DBHOST = "your.database.server"
-
-### If you’re using MongoDB
-
-If your MongoDB installation accepts connections from localhost, and you’re happy for your Known MongoDB database to be called Known, you can simply create a file called ```config.ini``` in the root of your installation containing:
-
-    database = "MongoDB"
-
-If you’d like to use an alternative [MongoDB connection string](http://docs.mongodb.org/manual/reference/connection-string/), you can add that to ```config.ini``` like this:
-
-    [Database configuration]
-    dbstring = "Your MongoDB connection string"
-    dbname = "Your preferred Known database name"
-
-You can also include a subset of these items, for example to just change the database name.
 
 ### If you’re using MySQL
 
@@ -62,6 +48,12 @@ If you need to use a non-standard database port, you can also select this:
     dbport = "Your database port"
 
 Additionally, you will need to create the database referred to in this configuration file, and ensure that it can be connected to using the user credentials you supply. For now, you will need to load the SQL schema stored in /schemas/mysql/mysql.sql.
+
+### If you’re using Postgres
+
+Postgres users follow the MySQL instructions above, but set your database engine as follows:
+
+    database = "Postgres"
 
 ### If you're using SQLite
 
@@ -91,6 +83,39 @@ Of course, replace the path with the path to your data folder.
 
 If you're using MySQL or SQLite, you must specify an upload directory if you want to store files, images or profile pictures.
 
+### If you’re using MongoDB
+
+** MongoDB support is deprecated, we recommend using one of the other DB Backends (MySQL is recommended) **
+
+If your MongoDB installation accepts connections from localhost, and you’re happy for your Known MongoDB database to be called Known, you can simply create a file called ```config.ini``` in the root of your installation containing:
+
+    database = "MongoDB"
+
+If you’d like to use an alternative [MongoDB connection string](http://docs.mongodb.org/manual/reference/connection-string/), you can add that to ```config.ini``` like this:
+
+    dbstring  = "Your MongoDB connection string"
+    dbname    = "Your preferred Known database name (default=known)"
+
+You can also include a subset of these items, for example to just change the database name.
+
+By default, MongoDB will accept unauthenticated connections from localhost. If you've locked down your MongoDB to require authentication, you can set a username, password, and [authentication source](https://docs.mongodb.org/manual/core/security-users/#user-authentication-database):
+
+    dbuser    = "Your MongoDB user"
+    dbpass    = "Your MongoDB user's password"
+    dbauthsrc = "The database where this user is defined"
+
+When using authentication, your MongoDB user will need to be granted the ["readWrite"](https://docs.mongodb.org/manual/reference/built-in-roles/#readWrite) role on both the Known database and a database called `idnosession` where session information is stored. For example to create a user called "knownuser" in the "admin" database, you might run these commands on the Mongo command line:
+
+    use admin
+    db.createUser({user:"knownuser", pwd:"p@ssword", roles: [
+      {role: "readWrite", db: "known"},
+      {role: "readWrite", db: "idnosession"}
+    ]})
+
+#### Upgrading from old mongo driver
+
+If you're upgrading from an older release (0.9.2 and below) you will need to install the new [PHP mongodb driver](https://secure.php.net/manual/en/set.mongodb.php).
+
 ### Load Known
 
 Launch Known in a web browser.
@@ -102,4 +127,3 @@ Register and log in.
 ### Administer Known
 
 Once you’ve registered and logged in, click “Administration” in the menu bar. This will allow you to set some site configuration items, including the site name. You will also be able to enable some plugins from this screen. If you’re using Known as a blog or a closed community, you will probably also want to turn open registration off from here.
-

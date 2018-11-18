@@ -18,7 +18,7 @@
                                     <span class="btn btn-primary btn-file">
                                         <i class="fa fa-upload"></i>
 										<span id="photo-filename">Select a comic</span> 
-                                        <input type="file" name="comic" id="comic" class="form-control" accept="image/*;capture=camera" onchange="comicPreview(this)"/>
+                                        <input type="file" name="comic" id="comic" class="form-control" accept="image/*" capture="camera" onchange="comicPreview(this)"/>
 
                                     </span>
                             </label>
@@ -47,12 +47,13 @@
 
             </div>
             <?=$this->draw('entity/tags/input');?>
-            <?php if (empty($vars['object']->_id)) { ?><input type="hidden" name="forward-to" value="<?= \Idno\Core\site()->config()->getDisplayURL() . 'content/all/'; ?>" /><?php } ?>
-            <?php if (empty($vars['object']->_id)) echo $this->drawSyndication('article'); ?>
+            <?php if (empty($vars['object']->_id)) { ?><input type="hidden" name="forward-to" value="<?= \Idno\Core\Idno::site()->config()->getDisplayURL() . 'content/all/'; ?>" /><?php } ?>
+            <?php echo $this->drawSyndication('article', $vars['object']->getPosseLinks()); ?>
             <p>
-                <?= \Idno\Core\site()->actions()->signForm('/text/edit') ?>
+                <?= \Idno\Core\Idno::site()->actions()->signForm('/text/edit') ?>
                 <input type="submit" class="btn btn-primary" value="Save" />
                 <input type="button" class="btn" value="Cancel" onclick="hideContentCreateForm();" />
+                <?= $this->draw('content/extra'); ?>
                 <?= $this->draw('content/access'); ?>
             </p>
 

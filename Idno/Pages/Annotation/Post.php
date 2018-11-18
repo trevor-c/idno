@@ -25,12 +25,16 @@
             {
 
                 $this->createGatekeeper(); // User is logged in and can post content
-
+                
+                if ($this->xhr) {
+                    \Idno\Core\Idno::site()->template()->setTemplateType('json'); // Set template
+                }
+                
                 // Get variables
                 $body        = $this->getInput('body');
                 $object_uuid = $this->getInput('object');
                 $type        = $this->getInput('type');
-                $user        = \Idno\Core\site()->session()->currentUser();
+                $user        = \Idno\Core\Idno::site()->session()->currentUser();
                 if ($type != 'like') {
                     $type = 'reply';
                 }
@@ -41,7 +45,7 @@
                     if ($type == 'like') {
                         if ($like_annotations = $object->getAnnotations('like')) {
                             foreach ($like_annotations as $like) {
-                                if ($like['owner_url'] == \Idno\Core\site()->session()->currentUser()->getURL()) {
+                                if ($like['owner_url'] == \Idno\Core\Idno::site()->session()->currentUser()->getURL()) {
                                     $object->removeAnnotation($like['permalink']);
                                     $object->save();
                                     $has_liked = true;
@@ -54,10 +58,28 @@
                         if ($object->addAnnotation($type, $user->getTitle(), $user->getURL(), $user->getIcon(), $body)) {
                             $object->save();
                         }
+                    } 
+                    
+                    if ($this->xhr) {
+                        
+                        $likes = $object->countAnnotations('like');
+                        if ($likes == 1) {
+                            $heart_text = 'star';
+                        } else {
+                            $heart_text = 'stars';
+                        }
+                        
+                        \Idno\Core\Idno::site()->template()->__([
+                            'number' => $likes,
+                            'text' => "$likes $heart_text"
+                        ])->drawPage();
                     }
-                    $this->forward($object->getURL() . '#comments');
+                    
+                    $this->forward($object->getDisplayURL() . '#comments');
                 }
 
+                // Missing object, error
+                $this->goneContent ();
             }
 
         }

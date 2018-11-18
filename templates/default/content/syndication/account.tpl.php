@@ -17,8 +17,16 @@
 
         ?>
         <span class="syndication-toggle">
-            <input type="checkbox" class="checkbox" name="syndication[]" id="syndication_<?=$vars['service']?>_<?=$identifier?>_toggle" value="<?=$vars['service']?>::<?=htmlentities($vars['username'])?>" data-toggle="toggle" data-onstyle="info" data-on="<?=$human_icon;?>&nbsp;<?=$human_name;?>" data-off="<?=$human_icon;?>&nbsp;<?=$human_name;?>" <?php if ($vars['selected'] == true) echo 'checked'; ?>>
+            <input type="checkbox" class="checkbox" <?=$vars['disabled']?> name="syndication[]" id="syndication_<?=$vars['service']?>_<?=$identifier?>_toggle" value="<?=$vars['service']?>::<?=htmlentities($vars['username'])?>" data-toggle="toggle" data-onstyle="info" data-on="<?=$human_icon;?>&nbsp;<?=$human_name;?>" data-off="<?=$human_icon;?>&nbsp;<?=$human_name;?>" <?php if ($vars['selected'] == true) echo 'checked'; ?>>
         </span>
     <?php
 
+        $this->documentFormControl("syndication[]", [
+            'type' => 'checkbox',
+            'disabled' => !empty($vars['disabled']),
+            'id' => "syndication_{$vars['service']}_{$identifier}_toggle",
+            'service' => $vars['service'],
+            'username' => htmlentities($vars['username']),   
+            'checked' => $vars['selected'] == true
+        ]);
     }

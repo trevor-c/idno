@@ -14,7 +14,7 @@
             <div class="upload">
                 <span class="camera btn-file" type="button" value="Add a photo of yourself">
                     <span id="photo-filename">Add a photo of yourself</span>
-                    <input type="file" name="avatar" id="photo" class="col-md-9" accept="image/*;capture=camera"
+                    <input type="file" name="avatar" id="photo" class="col-md-9" accept="image/*" capture="camera"
                            onchange="photoPreview(this)"/>
                 </span>
             </div>
@@ -42,7 +42,7 @@
             </p>
             <div class="col-md-12">
                 <div class="submit">
-                    <?= \Idno\Core\site()->actions()->signForm('/profile/' . $vars['user']->getHandle()) ?>
+                    <?= \Idno\Core\Idno::site()->actions()->signForm('/profile/' . $vars['user']->getHandle()) ?>
                     <input type="submit" value="Save profile" class="btn btn-primary btn-lg btn-responsive">
                     <input type="hidden" name="onboarding" value="1"/>
                 </div>

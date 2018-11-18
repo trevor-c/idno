@@ -1,106 +1,129 @@
 <?= $this->draw('entity/edit/header'); ?>
-    <form action="<?= $vars['object']->getURL() ?>" method="post">
+<form action="<?= $vars['object']->getURL() ?>" method="post">
 
-        <div class="row">
+    <div class="row">
 
-            <div class="col-md-8 col-md-offset-2 edit-pane">
-                <h4>
-                    <?php
+        <div class="col-md-8 col-md-offset-2 edit-pane">
+            <h4>
+                <?php
 
-                        if (empty($vars['object']->_id)) {
-                            ?>New Bookmark<?php
-                        } else {
-                            ?>Edit Bookmark<?php
-                        }
+                    if (empty($vars['object']->_id)) {
+                        ?>New Bookmark<?php
+                    } else {
+                        ?>Edit Bookmark<?php
+                    }
 
-                    ?>
-                </h4>
+                ?>
+            </h4>
 
-                <div class="content-form">
-                    <label for="body">
-                        Page address</label>
-                        <input required type="url" name="body" id="body" placeholder="http://...."
-                               value="<?php if (empty($vars['url'])) {
-                                   echo htmlspecialchars($vars['object']->body);
-                               } else {
-                                   echo htmlspecialchars($vars['url']);
-                               } ?>" class="form-control bookmark-url"/>
-                    </label>
-                    <?php
+            <div class="content-form">
+                <label for="body">
+                    Link Address</label>
+                <?php
+                $value = "";
+                if (empty($vars['url'])) {
+                    $value = $vars['object']->body;
+                } else {
+                    $value = $vars['url'];
+                }
+                echo $this->__([
+                    'name' => 'body',
+                    'id' => 'body',
+                    'placeholder' => "https://....",
+                    'class' => "form-control bookmark-url",
+                    'value' => $value,
+                    'required' => true
+                ])->draw('forms/input/url');
+                ?>
+                </label>
+                <?php
 
-                        if (empty($vars['url'])) {
+                    if (empty($vars['url'])) {
 
-                    ?>
+                        ?>
 
-                    <div class="bookmark-spinner-container">
-                        <div class="spinner bookmark-title-spinner" style="display:none">
-                            <div class="bounce1"></div>
-                            <div class="bounce2"></div>
-                            <div class="bounce3"></div>
+                        <div class="bookmark-spinner-container">
+                            <?= $this->__(['class' => 'bookmark-title-spinner'])->draw('entity/edit/spinner'); ?>
                         </div>
-                    </div>
 
-                    <?php
+                        <?php
 
-                        }
+                    }
 
-                    ?>
-                    <div class="bookmark-title-container" for="title" <?php if (empty($vars['object']->pageTitle) && empty($vars['object']->_id)) { ?>style="display:none"<?php } ?>>
-                        <label for="title">
-                        Page title<br/>
-                        </label>
-                        <input required type="text" name="title" id="title" placeholder="Page name"
-                               value="<?php
-                                   echo htmlspecialchars($vars['object']->pageTitle);
-                               ?>" class="form-control bookmark-title" />
-                    </div>
-
+                ?>
+                <div class="bookmark-title-container" for="title"
+                     <?php if (empty($vars['object']->pageTitle) && empty($vars['object']->_id) && (empty($vars['url']) && empty($vars['object']->body))) { ?>style="display:none"<?php } ?>>
+                    <label for="title">
+                        Title<br/>
+                    </label>
                     <?= $this->__([
-                        'name' => 'description',
-                        'value' => $vars['object']->description,
-                        'object' => $object,
-                        'wordcount' => false,
-                        'class' => 'wysiwyg-short',
-                        'height' => 250,
-                        'placeholder' => 'This page is great because ...',
-                        'label' => 'Description and hashtags'
-                    ])->draw('forms/input/richtext')?>
+                            'name' => 'title', 
+                            'id' => 'title', 
+                            'placeholder' => 'Page name', 
+                            'value' => $vars['object']->pageTitle, 
+                            'required' => true,
+                            'class' => 'form-control bookmark-title'])->draw('forms/input/input'); ?>
+                    
                 </div>
-                <?=$this->draw('entity/tags/input');?>
-                <?php if (empty($vars['object']->_id)) echo $this->drawSyndication('bookmark'); ?>
-                <?php if (empty($vars['object']->_id)) { ?><input type="hidden" name="forward-to" value="<?= \Idno\Core\site()->config()->getDisplayURL() . 'content/all/'; ?>" /><?php } ?>
-                <?= $this->draw('content/access'); ?>
-                <p class="button-bar">
-                    <?= \Idno\Core\site()->actions()->signForm('/like/edit') ?>
-                    <input type="button" class="btn btn-cancel" value="Cancel" onclick="hideContentCreateForm();"/>
-                    <input type="submit" class="btn btn-primary" value="Save"/>
 
-                </p>
+                <?= $this->draw('content/unfurl'); ?>
+                
+                <?= $this->__([
+                    'name'        => 'description',
+                    'value'       => $vars['object']->description,
+                    'wordcount'   => false,
+                    'class'       => 'wysiwyg-short',
+                    'height'      => 250,
+                    'placeholder' => 'Add notes to your bookmark...',
+                    'label'       => 'Description'
+                ])->draw('forms/input/richtext') ?>
             </div>
+            <?= $this->draw('entity/tags/input'); ?>
+            <?php echo $this->drawSyndication('bookmark', $vars['object']->getPosseLinks()); ?>
+            <?php if (empty($vars['object']->_id)) { 
+                echo $this->__(['name' => 'forward-to', 'value' => \Idno\Core\Idno::site()->config()->getDisplayURL() . 'content/all/'])->draw('forms/input/hidden');
+            } ?>
+            <?= $this->draw('content/extra'); ?>
+            <?= $this->draw('content/access'); ?>
+            
+    
+            <p class="button-bar">
+                <?= \Idno\Core\Idno::site()->actions()->signForm('/like/edit') ?>
+                <input type="button" class="btn btn-cancel" value="Cancel" onclick="hideContentCreateForm();"/>
+                <input type="submit" class="btn btn-primary" value="Save"/>
 
+            </p>
         </div>
-    </form>
+
+    </div>
+    
+</form>
 <?= $this->draw('entity/edit/footer'); ?>
 <script language="javascript">
 
-    $(document).ready(function() {
+    $(document).ready(function () {
 
-        $('.bookmark-url').change(function() {
+        $('.bookmark-url').change(function () {
 
             if ($('bookmark-url').val() != "") {
                 $('.bookmark-title-spinner').show();
                 $.ajax({
                     dataType: "json",
-                    url: "<?=\Idno\Core\site()->config()->getDisplayURL()?>like/callback/",
+                    url: "<?=\Idno\Core\Idno::site()->config()->getDisplayURL()?>like/callback/",
                     data: {
                         url: $('.bookmark-url').val()
                     },
-                    success: function(data) {
-                        $('.bookmark-title').val(htmlEntityDecode(data.value));
+                    success: function (data) {
+                        $('.bookmark-title').val(data.value);
                         $('.bookmark-spinner-container').html(" ");
                         $('.bookmark-title-container').show();
+                        
+                        var unfurl = $('.bookmark-url').closest('form').find('.unfurl');
+                        unfurl.attr('data-url', $('.bookmark-url').val());
+                        Unfurl.unfurl(unfurl);
+                        
                     },
-                    error: function() {
+                    error: function () {
                         $('.bookmark-spinner-container').html(" ");
                         $('.bookmark-title-container').show();
                     }

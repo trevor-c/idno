@@ -20,19 +20,32 @@
             public $config;
             public $session;
             public $template;
+            public $language;
             public $actions;
             public $plugins;
             public $dispatcher;
+            public $queue;
             public $pagehandlers;
             public $public_pages;
             public $syndication;
+            /* @var \Psr\Log\LoggerInterface $logging */
             public $logging;
+            /* @var \Idno\Core\Idno $site */
             public static $site;
             public $currentPage;
             public $known_hub;
             public $helper_robot;
             public $reader;
             public $cache;
+            public $statistics;
+
+            function __construct()
+            {
+                parent::__construct();
+                // auth the user after all the plugins and pages have registered so they can respond to events
+                $this->session()->tryAuthUser();
+                $this->upgrade();
+            }
 
             function init()
             {
@@ -43,9 +56,14 @@
                     header('Location: ./warmup/');
                     exit; // Load the installer
                 }
-                switch ($this->config->database) {
+
+                // We need to load initial values from the .ini files
+                $this->config()->loadIniFiles();
+
+                switch (trim(strtolower($this->config->database))) {
+                    case 'mongo':
                     case 'mongodb':
-                        $this->db = new DataConcierge();
+                        $this->db = new \Idno\Data\Mongo();
                         break;
                     case 'mysql':
                         $this->db = new \Idno\Data\MySQL();
@@ -61,13 +79,7 @@
                         $this->db = new \Idno\Data\MySQL();
                         break;
                     default:
-                        if (class_exists("Idno\\Data\\{$this->config->database}")) {
-                            $db       = "Idno\\Data\\{$this->config->database}";
-                            $this->db = new $db();
-                        }
-                        if (empty($this->db)) {
-                            $this->db = new DataConcierge();
-                        }
+                        $this->db = $this->componentFactory($this->config->database, "Idno\\Core\\DataConcierge", "Idno\\Data\\", "Idno\\Data\\MySQL");
                         break;
                 }
 
@@ -87,26 +99,52 @@
                         }
                         break;
                 }
+
+                $this->logging = new Logging();
                 $this->config->load();
+
+                if (isset($this->config->loglevel) && $this->logging instanceof Logging) {
+                    $this->logging->setLogLevel($this->config->loglevel);
+                }
+
                 $this->session      = new Session();
                 $this->actions      = new Actions();
                 $this->template     = new Template();
+                $this->language     = new Language();
                 $this->syndication  = new Syndication();
-                $this->logging      = new Logging($this->config->log_level);
                 $this->reader       = new Reader();
                 $this->helper_robot = new HelperRobot();
+                $this->queue        = $this->componentFactory($this->config->event_queue, "Idno\\Core\\EventQueue", "Idno\\Core\\", "Idno\\Core\\SynchronousQueue");
+                $this->statistics   = $this->componentFactory($this->config->statistics_collector, "Idno\\Stats\\StatisticsCollector", "Idno\\Stats\\", "Idno\\Stats\\DummyStatisticsCollector");
+                
+                // Log some page statistics
+                \Idno\Stats\Timer::start('script');
+                register_shutdown_function(function () {
+                    $stats = \Idno\Core\Idno::site()->statistics();
+                    if (!empty($stats)) {
+                        $stats->timing('timer.script', \Idno\Stats\Timer::value('script'));
+                    }
+                });
                 
                 // Attempt to create a cache object, making use of support present on the system
-                if (extension_loaded('xcache')) {
+                if (extension_loaded('apc') && ini_get('apc.enabled'))
+                    $this->cache = new \Idno\Caching\APCuCache();
+                elseif (extension_loaded('xcache')) {
                     $this->cache = new \Idno\Caching\XCache();
                 }
+                else {
+                    // Ensure there is always a cache available
+                    $this->cache = new \Idno\Caching\FilesystemCache();
+                } 
                 // TODO: Support other persistent caching methods
 
                 // No URL is a critical error, default base fallback is now a warning (Refs #526)
-                if (!$this->config->url) throw new \Exception('Known was unable to work out your base URL! You might try setting url="http://yourdomain.com/" in your config.ini');
-                if ($this->config->url == '/') \Idno\Core\site()->logging->log('Base URL has defaulted to "/" because Known was unable to detect your server name. '
-                    . 'This may be because you\'re loading Known via a script. '
-                    . 'Try setting url="http://yourdomain.com/" in your config.ini to remove this message', LOGLEVEL_WARNING);
+                if (!defined('KNOWN_CONSOLE')) {
+                    if (!$this->config->url) throw new \Idno\Exceptions\ConfigurationException('Known was unable to work out your base URL! You might try setting url="http://yourdomain.com/" in your config.ini');
+                    if ($this->config->url == '/') $this->logging->warning('Base URL has defaulted to "/" because Known was unable to detect your server name. '
+                        . 'This may be because you\'re loading Known via a script. '
+                        . 'Try setting url="http://yourdomain.com/" in your config.ini to remove this message');
+                }
 
                 // Connect to a Known hub if one is listed in the configuration file
                 // (and this isn't the hub!)
@@ -118,14 +156,12 @@
                     !substr_count($_SERVER['REQUEST_URI'], '.') &&
                     $this->config->known_hub != $this->config->url
                 ) {
-                    site()->session()->hub_connect = time();
-                    \Idno\Core\site()->known_hub   = new \Idno\Core\Hub($this->config->known_hub);
-                    \Idno\Core\site()->known_hub->connect();
+                    site()->session()->hub_connect     = time();
+                    \Idno\Core\Idno::site()->known_hub = new \Idno\Core\Hub($this->config->known_hub);
+                    \Idno\Core\Idno::site()->known_hub->connect();
                 }
 
-                site()->session()->APIlogin();
                 User::registerEvents();
-                site()->session()->refreshCurrentSessionuser();
             }
 
             /**
@@ -133,24 +169,27 @@
              */
             function registerPages()
             {
+                $permalink_route = \Idno\Common\Entity::getPermalinkRoute();
 
                 /** Homepage */
-                $this->addPageHandler('', '\Idno\Pages\Homepage');
-                $this->addPageHandler('/', '\Idno\Pages\Homepage');
+                $this->addPageHandler('/?', '\Idno\Pages\Homepage');
+                $this->addPageHandler('/feed\.xml', '\Idno\Pages\Feed');
+                $this->addPageHandler('/feed/?', '\Idno\Pages\Feed');
+                $this->addPageHandler('/rss\.xml', '\Idno\Pages\Feed');
                 $this->addPageHandler('/content/([A-Za-z\-\/]+)+', '\Idno\Pages\Homepage');
 
                 /** Individual entities / posting / deletion */
                 $this->addPageHandler('/view/([\%A-Za-z0-9]+)/?', '\Idno\Pages\Entity\View');
                 $this->addPageHandler('/s/([\%A-Za-z0-9]+)/?', '\Idno\Pages\Entity\Shortlink');
-                $this->addPageHandler('/[0-9]+/([\%A-Za-z0-9\-\_]+)/?', '\Idno\Pages\Entity\View');
+                $this->addPageHandler($permalink_route . '/?', '\Idno\Pages\Entity\View');
                 $this->addPageHandler('/edit/([A-Za-z0-9]+)/?', '\Idno\Pages\Entity\Edit');
                 $this->addPageHandler('/delete/([A-Za-z0-9]+)/?', '\Idno\Pages\Entity\Delete');
                 $this->addPageHandler('/withdraw/([A-Za-z0-9]+)/?', '\Idno\Pages\Entity\Withdraw');
 
                 /** Annotations */
                 $this->addPageHandler('/view/([A-Za-z0-9]+)/annotations/([A-Za-z0-9]+)?', '\Idno\Pages\Annotation\View');
-                $this->addPageHandler('/[0-9]+/([\%A-Za-z0-9\-\_]+)/annotations/([A-Za-z0-9]+)?', '\Idno\Pages\Annotation\View');
-                $this->addPageHandler('/[0-9]+/([\%\A-Za-z0-9\-\_]+)/annotations/([A-Za-z0-9]+)/delete/?', '\Idno\Pages\Annotation\Delete'); // Delete annotation
+                $this->addPageHandler($permalink_route . '/annotations/([A-Za-z0-9]+)?', '\Idno\Pages\Annotation\View');
+                $this->addPageHandler($permalink_route . '/annotations/([A-Za-z0-9]+)/delete/?', '\Idno\Pages\Annotation\Delete'); // Delete annotation
                 $this->addPageHandler('/annotation/post/?', '\Idno\Pages\Annotation\Post');
 
                 /** Bookmarklets and sharing */
@@ -159,6 +198,9 @@
 
                 /** Mobile integrations */
                 $this->addPageHandler('/chrome/manifest\.json', '\Idno\Pages\Chrome\Manifest', true);
+                
+                /** Service worker */
+                $this->addPageHandler('/service-worker(\.min)?\.js', '\Idno\Pages\Chrome\ServiceWorker', true);
 
                 /** Files */
                 $this->addPageHandler('/file/upload/?', '\Idno\Pages\File\Upload', true);
@@ -174,6 +216,7 @@
                 $this->addPageHandler('/search/?', '\Idno\Pages\Search\Forward');
                 $this->addPageHandler('/search/mentions\.json', '\Idno\Pages\Search\Mentions');
                 $this->addPageHandler('/tag/([^\s]+)\/?', '\Idno\Pages\Search\Tags');
+		$this->addPageHandler('/search/users/?', '\Idno\Pages\Search\User');
 
                 /** robots.txt */
                 $this->addPageHandler('/robots\.txt', '\Idno\Pages\Txt\Robots');
@@ -189,8 +232,19 @@
                 $this->addPageHandler('/begin/connect\-forwarder/?', '\Idno\Pages\Onboarding\ConnectForwarder');
                 $this->addPageHandler('/begin/publish/?', '\Idno\Pages\Onboarding\Publish');
 
+                /** Add some services */
+                $this->addPageHandler('/service/db/optimise/?', '\Idno\Pages\Service\Db\Optimise');
+                $this->addPageHandler('/service/vendor/messages/?', '\Idno\Pages\Service\Vendor\Messages');
+                $this->addPageHandler('/service/security/csrftoken/?', '\Idno\Pages\Service\Security\CSRFToken');
+                $this->addPageHandler('/service/web/unfurl/?', '\Idno\Pages\Service\Web\UrlUnfurl');
+                $this->addPageHandler('/service/web/imageproxy/([^\/]+)/?', '\Idno\Pages\Service\Web\ImageProxy');
+                $this->addPageHandler('/service/web/imageproxy/([^\/]+)/([0-9]+)/?', '\Idno\Pages\Service\Web\ImageProxy'); // With scale
+                $this->addPageHandler('/service/web/imageproxy/([^\/]+)/([0-9]+)/([^\/]+)/?', '\Idno\Pages\Service\Web\ImageProxy'); // With scale, with transform
+                $this->addPageHandler('/service/system/log/?', '\Idno\Pages\Service\System\Log');
+
+                // These must be loaded last
+                $this->plugins = new Plugins();
                 $this->themes  = new Themes();
-                $this->plugins = new Plugins(); // This must be loaded last
 
             }
 
@@ -215,6 +269,16 @@
             }
 
             /**
+             * Access to the EventQueue for dispatching events
+             * asynchronously
+             * @return \Idno\Core\EventQueue
+             */
+            function &queue()
+            {
+                return $this->queue;
+            }
+
+            /**
              * Returns the current filesystem
              * @return \Idno\Files\FileSystem
              */
@@ -234,20 +298,29 @@
 
             /**
              * Returns the current logging interface
-             * @return \Idno\Core\Logging
+             * @return \Psr\Log\LoggerInterface
              */
             function &logging()
             {
                 return $this->logging;
             }
-            
+
             /**
              * Return a persistent cache object.
              * @return \Idno\Caching\PersistentCache
              */
-            function &cache() 
+            function &cache()
             {
                 return $this->cache;
+            }
+            
+            /**
+             * Return a statistics collector
+             * @return \Idno\Stats\StatisticsCollector
+             */
+            function &statistics()
+            {
+                return $this->statistics;
             }
 
             /**
@@ -262,6 +335,11 @@
 
             function triggerEvent($eventName, $data = array(), $default = true)
             {
+                $stats = $this->statistics();
+                if (!empty($stats)) {
+                    $stats->increment ("event.$eventName");
+                }
+                
                 $event = new Event($data);
                 $event->setResponse($default);
                 $event = $this->events()->dispatch($eventName, $event);
@@ -337,6 +415,19 @@
             }
 
             /**
+             * Return the language handler associated with this site
+             * @return \Idno\Core\Language
+             */
+            function &language()
+            {
+                if (empty($this->language)) {
+                    $this->language = new Language();
+                }
+
+                return $this->language;
+            }
+
+            /**
              * Return the action helper associated with this site
              * @return \Idno\Core\Actions
              */
@@ -377,7 +468,7 @@
              * page handling syntax
              *
              * @param string $pattern The pattern to match
-             * @param callable $handler The handler callable that will serve the page
+             * @param string $handler The name of the Page class that will serve this route
              * @param bool $public If set to true, this page is always public, even on non-public sites
              */
 
@@ -394,6 +485,8 @@
                     if ($public == true) {
                         $this->public_pages[] = $handler;
                     }
+                } else {
+                    $this->logging()->error("Could not add $pattern. $handler not found");
                 }
             }
 
@@ -402,7 +495,7 @@
              * page handling syntax - and ensures it will be handled first
              *
              * @param string $pattern The pattern to match
-             * @param callable $handler The handler callable that will serve the page
+             * @param string $handler The name of the Page class that will serve this route
              * @param bool $public If set to true, this page is always public, even on non-public sites
              */
             function hijackPageHandler($pattern, $handler, $public = false)
@@ -473,9 +566,7 @@
 
             function getPageHandler($path_info)
             {
-                if (substr_count($path_info, \Idno\Core\site()->config()->url)) {
-                    $path_info = '/' . str_replace(\Idno\Core\site()->config()->url, '', $path_info);
-                }
+                $path_info = parse_url($path_info, PHP_URL_PATH);
                 if ($q = strpos($path_info, '?')) {
                     $path_info = substr($path_info, 0, $q);
                 }
@@ -526,53 +617,49 @@
                     return $this->currentPage;
                 }
 
-                return new Page();
-            }
-
-            /**
-             * Retrieves admins for this site
-             * @return array
-             */
-            function getAdmins()
-            {
-                return User::get(['admin' => true], [], 9999);
+                return false;
             }
 
             /**
              * Retrieve this version of Known's version number
              * @return string
+             * @deprecated Use Version::version();
              */
-            function version()
-            {
-                return '0.8.3.1';
+            function version() { 
+                trigger_error("Idno::version() has been deprecated, use Version::version()");
+                return Version::version(); 
             }
 
             /**
              * Alias for version()
              * @return string
+             * @deprecated Use Version::version();
              */
-            function getVersion()
-            {
-                return $this->version();
+            function getVersion() { 
+                trigger_error("Idno::getVersion() has been deprecated, use Version::version()");
+                return $this->version(); 
             }
 
             /**
-             * Retrieve a machine-readale version of Known's version number
+             * Retrieve a machine-readable version of Known's version number
              * @return string
+             * @deprecated Use Version::build();
              */
-            function machineVersion()
-            {
-                return '2015081901';
+            function machineVersion() { 
+                trigger_error("Idno::machineVersion() has been deprecated, use Version::build()");
+                return Version::build(); 
             }
 
             /**
-             * Alias for getMachineVersion
+             * Alias for machineVersion
              * @return string
+             * @deprecated Use Version::build();
              */
-            function getMachineVersion()
-            {
-                return $this->machineVersion();
+            function getMachineVersion() { 
+                trigger_error("Idno::getMachineVersion() has been deprecated, use Version::build()");
+                return $this->machineVersion(); 
             }
+            
 
             /**
              * Can a specified user (either an explicitly specified user ID
@@ -589,10 +676,10 @@
             function canEdit($user_id = '')
             {
 
-                if (!\Idno\Core\site()->session()->isLoggedOn()) return false;
+                if (!\Idno\Core\Idno::site()->session()->isLoggedOn()) return false;
 
                 if (empty($user_id)) {
-                    $user_id = \Idno\Core\site()->session()->currentUserUUID();
+                    $user_id = \Idno\Core\Idno::site()->session()->currentUserUUID();
                 }
 
                 if ($user = \Idno\Entities\User::getByUUID($user_id)) {
@@ -617,21 +704,25 @@
 
             function canWrite($user_id = '')
             {
-                if (!\Idno\Core\site()->session()->isLoggedOn()) return false;
+                if (!\Idno\Core\Idno::site()->session()->isLoggedOn()) return false;
 
                 if (empty($user_id)) {
-                    $user_id = \Idno\Core\site()->session()->currentUserUUID();
+                    $user_id = \Idno\Core\Idno::site()->session()->currentUserUUID();
                 }
 
                 if ($user = \Idno\Entities\User::getByUUID($user_id)) {
 
                     // Remote users can't ever create anything :( - for now
-                    if ($user instanceof \Idno\Entities\RemoteUser)
+                    if ($user instanceof \Idno\Entities\RemoteUser) {
                         return false;
+                    }
 
                     // But local users can
-                    if ($user instanceof \Idno\Entities\User)
-                        return true;
+                    if ($user instanceof \Idno\Entities\User) {
+                        if (empty($user->read_only)) {
+                            return true;
+                        }
+                    }
 
                 }
 
@@ -668,20 +759,25 @@
 
                 // Set our defaults (TODO: Set these cleaner, perhaps through the template system)
                 $icons['defaults'] = [
-                    'default'     => \Idno\Core\site()->config()->getDisplayURL() . 'gfx/logos/logo_k.png',
-                    'default_16'  => \Idno\Core\site()->config()->getDisplayURL() . 'gfx/logos/logo_k_16.png',
-                    'default_32'  => \Idno\Core\site()->config()->getDisplayURL() . 'gfx/logos/logo_k_32.png',
-                    'default_64'  => \Idno\Core\site()->config()->getDisplayURL() . 'gfx/logos/logo_k_64.png',
+                    'default'     => \Idno\Core\Idno::site()->config()->getDisplayURL() . 'gfx/logos/logo_k.png',
+                    'default_16'  => \Idno\Core\Idno::site()->config()->getDisplayURL() . 'gfx/logos/logo_k_16.png',
+                    'default_32'  => \Idno\Core\Idno::site()->config()->getDisplayURL() . 'gfx/logos/logo_k_32.png',
+                    'default_36'  => \Idno\Core\Idno::site()->config()->getDisplayURL() . 'gfx/logos/logo_k_36.png',
+                    'default_48'  => \Idno\Core\Idno::site()->config()->getDisplayURL() . 'gfx/logos/logo_k_48.png',
+                    'default_64'  => \Idno\Core\Idno::site()->config()->getDisplayURL() . 'gfx/logos/logo_k_64.png',
+                    'default_96'  => \Idno\Core\Idno::site()->config()->getDisplayURL() . 'gfx/logos/logo_k_96.png',
 
                     // Apple logos
-                    'default_57'  => \Idno\Core\site()->config()->getDisplayURL() . 'gfx/logos/apple-icon-57x57.png',
-                    'default_72'  => \Idno\Core\site()->config()->getDisplayURL() . 'gfx/logos/apple-icon-72x72.png',
-                    'default_114' => \Idno\Core\site()->config()->getDisplayURL() . 'gfx/logos/apple-icon-114x114.png',
-                    'default_144' => \Idno\Core\site()->config()->getDisplayURL() . 'gfx/logos/apple-icon-144x144.png',
+                    'default_57'  => \Idno\Core\Idno::site()->config()->getDisplayURL() . 'gfx/logos/apple-icon-57x57.png',
+                    'default_72'  => \Idno\Core\Idno::site()->config()->getDisplayURL() . 'gfx/logos/apple-icon-72x72.png',
+                    'default_114' => \Idno\Core\Idno::site()->config()->getDisplayURL() . 'gfx/logos/apple-icon-114x114.png',
+                    'default_144' => \Idno\Core\Idno::site()->config()->getDisplayURL() . 'gfx/logos/apple-icon-144x144.png',
+                    
+                    'default_192' => \Idno\Core\Idno::site()->config()->getDisplayURL() . 'gfx/logos/logo_k_192.png',
                 ];
 
                 // If we're on a page, see if that has a specific icon
-                if ($page = \Idno\Core\site()->currentPage()) {
+                if ($page = \Idno\Core\Idno::site()->currentPage()) {
                     if ($page_icons = $page->getIcon()) {
                         $icons['page'] = $page_icons;
                     }
@@ -701,12 +797,14 @@
                 if (!empty(site()->config()->noping)) {
                     return '';
                 }
-                $web_client = new Webservice();
-                $results    = $web_client->post('https://withknown.com/vendor-services/messages/', array(
+
+                $results    = Webservice::post('https://withknown.com/vendor-services/messages/', array(
                     'url'     => site()->config()->getURL(),
                     'title'   => site()->config()->getTitle(),
                     'version' => site()->getVersion(),
                     'public'  => site()->config()->isPublicSite(),
+                    'phpversion' => phpversion(),
+                    'dbengine' => get_class(site()->db()),
                     'hub'     => site()->config()->known_hub
                 ));
                 if ($results['response'] == 200) {
@@ -746,8 +844,37 @@
             {
                 return
                     (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
-                    || $_SERVER['SERVER_PORT'] == 443
+                    || (!empty($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == 443)
                     || (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] == 'https');
+            }
+            
+            /**
+             * Apply updates.
+             */
+            function upgrade() {
+                
+                $last_update = 0;
+                if (!empty($this->config()->update_version)) {
+                    $last_update = $this->config()->update_version;
+                }
+                $machine_version = Version::build();
+                
+                if ($last_update < $machine_version) {
+                
+                    if ($this->triggerEvent('upgrade', [
+                        'last_update' => $last_update,
+                        'new_version' => $machine_version
+                    ])) {
+                    
+                        // Save updated
+                        $this->config()->update_version = $machine_version;
+                        $this->config()->save();
+                        
+                        $this->logging()->info("Known upgraded from $last_update to $machine_version");
+                    } else {
+                        $this->logging()->error("There was a problem applying an update.");
+                    }
+                }
             }
 
             /**
@@ -758,11 +885,73 @@
             {
                 return [];
             }
+
+            /**
+             * Helper method that returns the current site object
+             * @return \Idno\Core\Idno $site
+             */
+            static function &site()
+            {
+                return self::$site;
+            }
+
+            /**
+             * Attempt to construct a component.
+             * This allows for config configurable, and plugin extensible, system conponents, without the need for a lot of repeat typing.
+             * @param string $className Class name of component, either partial or full namespace
+             * @param string $expectedBaseClass Class type to verify newly created component against
+             * @param string $defaultClassNameBase If a full namespace is not provided in $configValue, use this value as base class namespace
+             * @param string $defaultClass If class could not be constructed, return a new instance of this class name
+             */
+            public function componentFactory($className, $expectedBaseClass = "Idno\\Common\\Component" , $defaultClassNameBase = "Idno\\Core\\", $defaultClass = null) {
+                
+                $component = null;
+                
+                // Try full namespace
+                if (class_exists($className)) {
+                    if (is_subclass_of($className, $expectedBaseClass)) {
+                        $class = $className;
+                    }
+                }
+                
+                // Attempt base class creation
+                if (empty($class)) {
+                    if (class_exists($defaultClassNameBase . $className)) {
+                        $class = $defaultClassNameBase . $className; 
+                    } 
+                } 
+                
+                // Now try and create it
+                if (!empty($class)) {
+                    if (is_subclass_of($class, $expectedBaseClass)) {
+                        $component = new $class();
+                    } 
+                }
+                
+                // Do we have a class yet? otherwise try a default
+                if (empty($component)) {
+                
+                    if (!empty($defaultClass)) {
+
+                        if (is_string($defaultClass)) 
+                            $component = new $defaultClass();
+                        else
+                            $component = $defaultClass;
+                        
+                        // validate
+                        if (!is_subclass_of($component, $expectedBaseClass))
+                                $component = null;
+                    }
+                }
+                
+                return $component;
+            }
         }
 
         /**
          * Helper function that returns the current site object
-         * @return \Idno\Core\Idno
+         * @deprecated Use \Idno\Core\Idno::site()
+         * @return \Idno\Core\Idno $site
          */
         function &site()
         {

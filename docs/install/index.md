@@ -11,3 +11,12 @@
 # Configuring Known
 
 * [Using config.ini to configure Known](config.md)
+
+# Debugging Known
+
+* [Using logs](debugging.md)
+* [Diagnostics](debugging.md)
+
+# Troubleshooting
+
+* [Troubleshooting Known](troubleshooting.md)

@@ -1,7 +1,7 @@
-<link rel="stylesheet" href="<?php echo \Idno\Core\site()->config()->getDisplayURL() ?>IdnoPlugins/Checkin/external/leaflet/leaflet.css"/>
+<link rel="stylesheet" href="<?php echo \Idno\Core\Idno::site()->config()->getDisplayURL() ?>IdnoPlugins/Checkin/external/leaflet/leaflet.css"/>
 <!--[if lte IE 8]>
-<link rel="stylesheet" href="<?php echo \Idno\Core\site()->config()->getDisplayURL() ?>IdnoPlugins/Checkin/external/leaflet/leaflet.ie.css"/>
+<link rel="stylesheet" href="<?php echo \Idno\Core\Idno::site()->config()->getDisplayURL() ?>IdnoPlugins/Checkin/external/leaflet/leaflet.ie.css"/>
 <![endif]-->
-<script type="text/javascript" src="<?php echo \Idno\Core\site()->config()->getDisplayURL() ?>IdnoPlugins/Checkin/external/leaflet/leaflet.js"></script>
-<script type="text/javascript" src="<?php echo \Idno\Core\site()->config()->getDisplayURL() ?>IdnoPlugins/Checkin/external/stamen-maps/tile.stamen.js"></script>
-<script type="text/javascript" src="<?php echo \Idno\Core\site()->config()->getDisplayURL() ?>IdnoPlugins/Checkin/external/leaflet-providers/leaflet-providers.js"></script>
+<script type="text/javascript" src="<?php echo \Idno\Core\Idno::site()->config()->getDisplayURL() ?>IdnoPlugins/Checkin/external/leaflet/leaflet.js"></script>
+<script type="text/javascript" src="<?php echo \Idno\Core\Idno::site()->config()->getDisplayURL() ?>IdnoPlugins/Checkin/external/stamen-maps/tile.stamen.min.js"></script>
+<script type="text/javascript" src="<?php echo \Idno\Core\Idno::site()->config()->getDisplayURL() ?>IdnoPlugins/Checkin/external/leaflet-providers/leaflet-providers.js"></script>

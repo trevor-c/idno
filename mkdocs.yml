@@ -1,5 +1,7 @@
 site_name: Known Documentation
 theme: readthedocs
+markdown_extensions:
+ - admonition
 pages:
 - ['index.md', 'Known Documentation']
 - ['install/index.md', 'Installing and upgrading Known', 'Introduction']
@@ -8,12 +10,15 @@ pages:
 - ['install/upgrade.md', 'Installing and upgrading Known', 'Upgrading Known']
 - ['install/config.md', 'Installing and upgrading Known', 'Using config.ini']
 - ['install/sharedhost.md', 'Installing and upgrading Known', 'Instructions for common shared hosting providers']
-- ['install/sharedhost/arvixe.md', 'Installing and upgrading Known', 'Installing on Arvixe']
+- ['install/advanced.md', 'Installing and upgrading Known', 'Advanced Options']
+- ['install/debugging.md', 'Installing and upgrading Known', 'Debugging Known']
+- ['install/troubleshooting.md', 'Installing and upgrading Known', 'Troubleshooting your installation']
 - ['plugins/index.md', 'Plugins', 'Plugins']
 - ['plugins/project.md', 'Plugins', 'Known project plugins']
 - ['plugins/community.md', 'Plugins', 'Community plugins']
 - ['developers/index.md', 'Known for developers', 'Introduction']
 - ['developers/standards.md', 'Known for developers', 'Coding standards']
+- ['developers/commit-messages.md', 'Known for developers', 'Good Commit Messages']
 - ['developers/plugins/index.md', 'Known for developers', 'Plugins']
 - ['developers/plugins/class.md', 'Known for developers', 'The plugin class']
 - ['developers/plugins/pages.md', 'Known for developers', 'Adding pages to your plugins']
@@ -22,6 +27,7 @@ pages:
 - ['developers/templating/index.md', 'Known for developers', 'Templating']
 - ['developers/templating/extending.md', 'Known for developers', 'Extending templates']
 - ['developers/themes/index.md', 'Known for developers', 'Themes']
+- ['developers/languages/index.md', 'Known for developers', 'Translating Known']
 - ['community/index.md', 'Open Source community', 'Introduction']
 - ['community/contributors.md', 'Open Source community', 'Contributors']
 - ['community/harassment.md', 'Open Source community', 'Anti-harassment policy']

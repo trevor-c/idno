@@ -1,22 +1,22 @@
 <?= $this->draw('entity/edit/header'); ?>
 <?php
-
     $autosave = new \Idno\Core\Autosave();
     if (!empty($vars['object']->body)) {
         $body = $vars['object']->body;
     } else {
-        $body = $autosave->getValue('entry', 'bodyautosave');
+        $body = '';
     }
     if (!empty($vars['object']->title)) {
         $title = $vars['object']->title;
     } else {
-        $title = $autosave->getValue('entry', 'title');
+        $title = '';
     }
     if (!empty($vars['object'])) {
         $object = $vars['object'];
     } else {
         $object = false;
     }
+    $unique_id = 'body'.rand(0, 9999);
 
     /* @var \Idno\Core\Template $this */
 
@@ -45,28 +45,33 @@
                     }
 
                 ?>
-                
+
                 <div class="content-form">
                     <label for="title">Title</label>
-                    <input type="text" name="title" id="title" placeholder="Give it a title" value="<?= htmlspecialchars($title) ?>" class="form-control"/>                    
+                    <?= $this->__(['name' => 'title', 'placeholder' => 'Give it a title', 'id' => 'title', 'value' => $title, 'required' => true, 'class' => 'form-control'])->draw('forms/input/input'); ?>
                 </div>
 
                 <?= $this->__([
                     'name' => 'body',
+                    'unique_id' => $unique_id,
                     'value' => $body,
                     'object' => $object,
-                    'wordcount' => true
+                    'wordcount' => true,
+                    'required' => true
                 ])->draw('forms/input/richtext')?>
                 <?= $this->draw('entity/tags/input'); ?>
 
-                <?php if (empty($vars['object']->_id)) echo $this->drawSyndication('article'); ?>
-                <?php if (empty($vars['object']->_id)) { ?><input type="hidden" name="forward-to" value="<?= \Idno\Core\site()->config()->getDisplayURL() . 'content/all/'; ?>" /><?php } ?>
-                
+                <?php echo $this->drawSyndication('article', $vars['object']->getPosseLinks()); ?>
+                <?php if (empty($vars['object']->_id)) { 
+                    echo $this->__(['name' => 'forward-to', 'value' => \Idno\Core\Idno::site()->config()->getDisplayURL() . 'content/all/'])->draw('forms/input/hidden');
+                } ?>
+
+                <?= $this->draw('content/extra'); ?>
                 <?= $this->draw('content/access'); ?>
 
                 <p class="button-bar ">
-	                
-                    <?= \Idno\Core\site()->actions()->signForm('/entry/edit') ?>
+
+                    <?= \Idno\Core\Idno::site()->actions()->signForm('/entry/edit') ?>
                     <input type="button" class="btn btn-cancel" value="Cancel" onclick="tinymce.EditorManager.execCommand('mceRemoveEditor',true, 'body'); hideContentCreateForm();"/>
                     <input type="submit" class="btn btn-primary" value="Publish"/>
 
@@ -76,5 +81,14 @@
 
         </div>
     </form>
-    <div id="bodyautosave" style="display:none"></div>
 <?= $this->draw('entity/edit/footer'); ?>
+<script>
+
+    $(document).ready(function(){
+        // Autosave the title & body
+        autoSave('entry', ['title', 'body'], {
+          'body': '#<?=$unique_id?>',
+        });
+    });
+
+</script>

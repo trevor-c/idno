@@ -13,40 +13,40 @@
         {
 
             public $config = array(
-                'database'             => 'mongodb',
-                'dbstring'             => 'mongodb://localhost:27017',
-                'dbname'               => 'known', // Default MongoDB database
-                'sessionname'          => 'known', // Default session name
-                'open_registration'    => true, // Can anyone register for this system?
-                'plugins'              => array( // Default plugins
-                                                 'Status',
-                                                 'Text',
-                                                 'Photo',
-                                                 'Like',
-                                                 'Checkin',
-                                                 'Media',
-                                                 'Firefox',
-                                                 'Bridgy',
-                                                 'FooterJS',
-                                                 'IndiePub',
-                                                 'Convoy'
-                ),
-                'themes'               => array(),
-                'antiplugins'          => array(),
-                'alwaysplugins'        => array(
-                    'Convoy'
-                ),
-                'prerequisiteplugins'  => array(),
-                'directloadplugins'    => array(),
-                'items_per_page'       => 10, // Default items per page
-                'experimental'         => false, // A common way to enable experimental functions still in development
-                'multitenant'          => false,
-                'default_config'       => true, // This is a trip-switch - changed to false if configuration is loaded from an ini file / the db
-                'loglevel'             => 5,
-                'multi_syndication'    => true,
-                'wayback_machine'      => false,
-                'static_url'           => false,
-                'user_avatar_favicons' => true
+                'database'               => 'mysql',
+                'dbstring'               => 'mongodb://localhost:27017',
+                'dbname'                 => 'known', // Default MongoDB database
+                'sessionname'            => 'known', // Default session name
+                'boolean_search'         => true, // Should search be boolean?
+                'open_registration'      => true, // Can anyone register for this system?
+                'initial_plugins'        => array('Status', 'Text', 'Photo', 'Event', 'Firefox', 'FooterJS', 'IndiePub', 'Styles'),
+                'plugins'                => array(), // Default plugins
+                'assets'                 => [      // Assets to be included
+                                                   'mediaelementplayer' => true,
+                                                   'fitvids'            => true,
+                ],
+                'themes'                 => array(),
+                'antiplugins'            => array(),
+                'alwaysplugins'          => array(),
+                'prerequisiteplugins'    => array(),
+                'directloadplugins'      => array(),
+                'hiddenthemes'           => array(),
+                'hiddenplugins'          => array(),
+                'items_per_page'         => 10, // Default items per page
+                'experimental'           => false, // A common way to enable experimental functions still in development
+                'multitenant'            => false,
+                'default_config'         => true, // This is a trip-switch - changed to false if configuration is loaded from an ini file / the db
+                'loglevel'               => 5,
+                'multi_syndication'      => true,
+                'wayback_machine'        => false,
+                'static_url'             => false,
+                'user_avatar_favicons'   => true,
+                'form_token_expiry'      => 3600,
+                'show_privacy'           => true,
+                'bypass_fulltext_search' => false,
+                'permalink_structure'    => '/:year/:slug',
+                'single_user'            => true,
+                'pedantic_mode'          => false, // When true, PHP errors (including notices) will throw exceptions.
             );
 
             public $ini_config = array();
@@ -100,35 +100,45 @@
              */
             function load()
             {
-                if ($config = \Idno\Core\site()->db()->getAnyRecord('config')) {
+                if ($config = \Idno\Core\Idno::site()->db()->getAnyRecord('config')) {
                     $this->default_config = false;
-                    if ($config instanceof \Idno\Common\Entity) {
-                        $config = $config->getAttributes();
-                        unset($config['dbname']); // Ensure we don't accidentally load protected data from db
-                        unset($config['dbpass']);
-                        unset($config['dbhost']);
-                        unset($config['dbstring']);
-                        unset($config['path']);
-                        unset($config['url']);
-                        unset($config['host']);
-                        unset($config['feed']);
-                        unset($config['uploadpath']);
-                        unset($config['initial_plugins']);
-                        unset($config['antiplugins']);
-                        unset($config['alwaysplugins']);
-                        unset($config['session_path']);
-                        unset($config['session_hash_function']);
-                        unset($config['sessions_database']);
-                        unset($config['cookie_jar']);
-                        unset($config['proxy_string']);
-                        unset($config['proxy_type']);
-                        unset($config['disable_ssl_verify']);
-                        unset($config['upload_tmp_dir']);
+                    unset($config['dbname']); // Ensure we don't accidentally load protected data from db
+                    unset($config['dbpass']);
+                    unset($config['dbhost']);
+                    unset($config['dbstring']);
+                    unset($config['path']);
+                    unset($config['url']);
+                    unset($config['host']);
+                    unset($config['feed']);
+                    unset($config['uploadpath']);
+                    unset($config['antiplugins']);
+                    unset($config['alwaysplugins']);
+                    unset($config['session_path']);
+                    unset($config['session_hash_function']);
+                    unset($config['sessions_database']);
+                    unset($config['sessions_storage']);
+                    unset($config['cookie_jar']);
+                    unset($config['proxy_string']);
+                    unset($config['proxy_type']);
+                    unset($config['disable_ssl_verify']);
+                    unset($config['upload_tmp_dir']);
+                    unset($config['bypass_fulltext_search']);
+                    $this->config = array_replace_recursive($this->config, $config);
+
+                    // Crufty hack to allow plugins to be toggled - loaded plugins ALWAYS take precidence (#1427)
+                    if (!empty($config['plugins'])) {
+                        $this->config['plugins'] = $config['plugins'];
                     }
-                    if (is_array($config)) {
-                        $this->config = array_merge($this->config, $config);
-                    }
+                } else {
+                    // If we don't have a saved config, this is a new site. Set some plugin defaults
+                    $config['plugins'][] = 'Status';
+                    $config['plugins'][] = 'Text';
+                    $config['plugins'][] = 'Photo';
+                    $config['plugins'][] = 'Firefox';
+                    $config['plugins'][] = 'FooterJS';
+                    $config['plugins'][] = 'IndiePub';
                 }
+
                 $this->loadIniFiles();
 
                 // If we don't have a site secret, create it
@@ -144,26 +154,31 @@
              */
             function loadIniFiles()
             {
-
                 if (empty($this->ini_config)) {
                     $this->ini_config = array();
-                    if ($config = @parse_ini_file($this->path . '/config.ini')) {
-                        $this->ini_config = array_merge($config, $this->ini_config);
+                    if ($config = @parse_ini_file($this->path . '/config.ini', true)) {
+                        if (!empty($config)) {
+                            $this->default_config = false;
+                            $this->ini_config     = array_replace_recursive($config, $this->ini_config);
+                        }
                     }
                     if (file_exists($this->path . '/config.json')) {
                         if ($json = file_get_contents($this->path . '/config.json')) {
                             if ($json = json_decode($json, true)) {
-                                $this->ini_config = array_merge($this->ini_config, $json);
+                                if (!empty($json)) {
+                                    $this->default_config = false;
+                                    $this->ini_config     = array_replace_recursive($this->ini_config, $json);
+                                }
                             }
                         }
                     }
 
                     // Per domain configuration
-                    if ($config = @parse_ini_file($this->path . '/' . $this->host . '.ini')) {
+                    if ($config = @parse_ini_file($this->path . '/' . $this->host . '.ini', true)) {
                         unset($this->ini_config['initial_plugins']);  // Don't let plugin settings be merged
                         unset($this->ini_config['alwaysplugins']);
                         unset($this->ini_config['antiplugins']);
-                        $this->ini_config = array_merge($this->ini_config, $config);
+                        $this->ini_config = array_replace_recursive($this->ini_config, $config);
                     }
 
                     // Check environment variables and set as appropriate
@@ -182,10 +197,8 @@
                 }
 
                 if (!empty($this->ini_config)) {
-                    $this->config         = array_merge($this->config, $this->ini_config);
-                    $this->default_config = false;
+                    $this->config = array_replace_recursive($this->config, $this->ini_config);
                 }
-
             }
 
             /**
@@ -195,7 +208,7 @@
             function save()
             {
                 $array = $this->config;
-                unset($array['dbname']); // Don't save database a
+                unset($array['dbname']); // Don't save database name
                 unset($array['dbpass']);
                 unset($array['dbhost']);
                 unset($array['dbstring']);
@@ -207,21 +220,27 @@
                 unset($array['session_path']); // Don't save the session path in the database
                 unset($array['session_hash_function']); // Don't save the session hash to database, we want the ability to upgrade
                 unset($array['sessions_database']); // Don't want to save sessions in database
+                unset($array['sessions_storage']); // Don't want to save sessions storage in db
                 unset($array['cookie_jar']); // Don't save the cookie path in the database
                 unset($array['proxy_string']);
                 unset($array['proxy_type']);
                 unset($array['disable_ssl_verify']);
                 unset($array['known_hub']);
+                unset($array['known_hubs']);
                 unset($array['directloadplugins']);
+                unset($array['bypass_fulltext_search']);
+                unset($array['filter_shell']);
 
-                if (\Idno\Core\site()->db()->saveRecord('config', $array)) {
+                if (\Idno\Core\Idno::site()->db()->saveRecord('config', $array)) {
                     $this->init();
                     $this->load();
+
                     return true;
                 }
 
                 $this->init();
                 $this->load();
+
                 return false;
             }
 
@@ -240,6 +259,7 @@
                 $this->indieweb_citation         = false;
                 $this->indieweb_reference        = false;
                 $this->known_hub                 = false;
+                $this->known_hubs                = [];
                 $this->hub                       = 'https://withknown.superfeedr.com/';
                 $this->session_path              = session_save_path(); // Session path when not storing sessions in the database
                 $this->session_hash_function     = 'sha256'; // Default hash function
@@ -250,6 +270,7 @@
                 $this->wayback_machine           = false; // Automatically ping new pages on public sites to the Internet Archive
 
                 $this->loadIniFiles();
+                $this->sanitizeValues();
 
                 if (substr($this->host, 0, 4) == 'www.') {
                     $this->host = substr($this->host, 4);
@@ -257,7 +278,8 @@
 
                 if ($this->multitenant) {
                     $dbname       = $this->dbname;
-                    $this->dbname = preg_replace('/[^0-9a-z\.\-\_]/i', '', $this->host);
+                    $host         = $this->host;
+                    $this->dbname = preg_replace('/[^0-9a-z\.\-\_]/i', '', $host);
 
                     // Known now defaults to not including periods in database names for multitenant installs. Add
                     // 'multitenant_periods = true' to config.ini if you wish to override this.
@@ -282,7 +304,6 @@
                 }
 
                 date_default_timezone_set($this->timezone);
-                //setlocale(LC_ALL, 'en_US.UTF8');
             }
 
             /**
@@ -317,6 +338,28 @@
                     $url .= '/'; // A naive default base URL
                     return $url;
                 }
+                
+                $domain = getenv('KNOWN_DOMAIN');
+                if (!empty($domain)) {
+                    // Server domain specified in environment variable, for cases when SERVER_NAME isn't specified.
+                    // This allows things like the console plugins to access the correct site when using domain
+                    // specific configurations.
+                    
+                    $url = (\Idno\Common\Page::isSSL() ? 'https://' : 'http://') . $domain;
+                    $port = getenv('KNOWN_PORT');
+                    if (!$port)
+                        $port = 80;
+                    
+                    if ($port != 80 && $port != 443) {
+                        $url .= ':' . $port;
+                    }
+                    
+                    if (defined('KNOWN_SUBDIRECTORY')) {
+                        $url .= '/' . KNOWN_SUBDIRECTORY;
+                    }
+                    $url .= '/'; // A naive default base URL
+                    return $url;
+                }
 
                 // No servername set, try something else
                 // TODO: Detect servername using other methods (but don't use HTTP_HOST)
@@ -334,13 +377,19 @@
             {
                 $url       = $this->getURL();
                 $urischeme = parse_url($url, PHP_URL_SCHEME);
-                if (site()->isSecure()) {
+                if (Idno::site()->isSecure()) {
                     $newuri = 'https:';
                 } else {
                     $newuri = 'http:';
                 }
 
-                return str_replace($urischeme . ':', $newuri, $url);
+                $url = str_replace($urischeme . ':', $newuri, $url);
+                if (substr($url, 0, 1) == ':') {
+                    $url = substr($url, 1);
+                }
+
+                return $url;
+                //return str_replace($urischeme . ':', '', $url);
             }
 
             /**
@@ -357,16 +406,65 @@
             }
 
             /**
+             * Returns the upload path for Known.
+             * @return string
+             */
+            function getUploadPath()
+            {
+                return $this->uploadpath;
+            }
+
+            /**
+             * Returns the installation path for Known.
+             * @return string
+             */
+            function getPath()
+            {
+                return $this->path;
+            }
+
+            /**
+             * Make sure configuration values are what you'd expect
+             */
+            protected function sanitizeValues()
+            {
+                $this->url        = $this->sanitizeURL($this->url);
+                $this->static_url = $this->sanitizeURL($this->static_url);
+            }
+
+            /**
+             * Given a URL, ensure it fits the content standards we need
+             * @param $url
+             * @return bool
+             */
+            function sanitizeURL($url)
+            {
+                if (!empty($url)) {
+                    if ($url_pieces = parse_url($url)) {
+                        if (substr($url, -1, 1) != '/') {
+                            $url .= '/';
+                        }
+
+                        return $url;
+                    }
+                }
+
+                return false;
+            }
+
+            /**
              * Make sure attachment URL is pointing to the right place
              * @param $url
              * @return mixed
              */
             function sanitizeAttachmentURL($url)
             {
-                if (!empty(\Idno\Core\site()->config()->attachment_base_host)) {
+                if (!empty(\Idno\Core\Idno::site()->config()->attachment_base_host)) {
                     $host = parse_url($url, PHP_URL_HOST);
-                    return str_replace($host, \Idno\Core\site()->config()->attachment_base_host, $url);
+
+                    return str_replace($host, \Idno\Core\Idno::site()->config()->attachment_base_host, $url);
                 }
+
                 return $url;
             }
 
@@ -374,11 +472,15 @@
              * Get a version of the URL without URI scheme or trailing slash
              * @return string
              */
-            function getSchemelessURL()
+            function getSchemelessURL($preceding_slashes = false)
             {
                 $url       = $this->getURL();
                 $urischeme = parse_url($url, PHP_URL_SCHEME);
-                $url       = str_replace($urischeme . '://', '', $url);
+                if ($preceding_slashes) {
+                    $url = str_replace($urischeme . ':', '', $url);
+                } else {
+                    $url = str_replace($urischeme . '://', '', $url);
+                }
                 if (substr($url, -1, 1) == '/') {
                     $url = substr($url, 0, strlen($url) - 1);
                 }
@@ -400,6 +502,23 @@
             }
 
             /**
+             * Adds an email address to the blocked list
+             * @param $email
+             * @return array|bool
+             */
+            function addBlockedEmail($email)
+            {
+                if (filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                    $emails   = $this->getBlockedEmails();
+                    $emails[] = trim(strtolower($email));
+
+                    return $this->blocked_emails = $emails;
+                }
+
+                return false;
+            }
+
+            /**
              * Retrieve an array of email addresses that are blocked from registering on this site.
              * @return array
              */
@@ -409,22 +528,8 @@
                 if (!empty($this->blocked_emails)) {
                     $emails = $this->blocked_emails;
                 }
-                return $emails;
-            }
 
-            /**
-             * Adds an email address to the blocked list
-             * @param $email
-             * @return array|bool
-             */
-            function addBlockedEmail($email)
-            {
-                if (filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                    $emails = $this->getBlockedEmails();
-                    $emails[] = trim(strtolower($email));
-                    return $this->blocked_emails = $emails;
-                }
-                return false;
+                return $emails;
             }
 
             /**
@@ -442,8 +547,10 @@
                         unset($emails[$key]);
                     }
                     site()->config()->blocked_emails = $emails;
+
                     return $count;
                 }
+
                 return false;
             }
 
@@ -462,6 +569,7 @@
                         }
                     }
                 }
+
                 return false;
             }
 
@@ -486,6 +594,19 @@
             {
                 if (!empty($this->title)) {
                     return $this->title;
+                }
+
+                return '';
+            }
+
+            /**
+             * Retrieve the description of this site
+             * @return string
+             */
+            function getDescription()
+            {
+                if (!empty($this->description)) {
+                    return $this->description;
                 }
 
                 return '';
@@ -645,6 +766,20 @@
                 }
 
                 return $path;
+            }
+
+            /**
+             * Get the configured permalink structure for posts in the
+             * format /:tag1/:tag2
+             * @return string
+             */
+            function getPermalinkStructure()
+            {
+                if (empty($this->permalink_structure)) {
+                    return '/:year/:slug';
+                }
+
+                return $this->permalink_structure;
             }
 
         }

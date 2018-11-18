@@ -4,6 +4,7 @@
 
         use Idno\Common\Entity;
         use Idno\Entities\File;
+        use Idno\Entities\User;
 
         class Migration extends \Idno\Common\Component
         {
@@ -14,47 +15,57 @@
              */
             static function exportToFolder($dir = false)
             {
-                
+
                 set_time_limit(0);  // Switch off the time limit for PHP
-                site()->currentPage()->setPermalink(true);
+                Idno::site()->currentPage()->setPermalink(true);
 
                 // Prepare a unique name for the archive
-                $name = md5(time() . rand(0, 9999) . site()->config()->getURL());
+                $name = md5(time() . rand(0, 9999) . Idno::site()->config()->getURL());
 
                 // If $folder is false or doesn't exist, use the temporary directory and ensure it has a slash on the end of it
                 if (!is_dir($dir)) {
-                    $dir = site()->config()->getTempDir();
+                    $dir = Idno::site()->config()->getTempDir();
                 }
 
                 // Make the temporary directory, or fail out
                 if (!@mkdir($dir . $name)) {
+                    \Idno\Core\Idno::site()->logging()->debug("Could not make temporary directory {$dir}{$name}");
                     return false;
                 }
                 $json_path = $dir . $name . DIRECTORY_SEPARATOR . 'json' . DIRECTORY_SEPARATOR;
                 if (!@mkdir($json_path)) {
+                    \Idno\Core\Idno::site()->logging()->debug("Could not make {$json_path}");
                     return false;
                 }
                 $html_path = $dir . $name . DIRECTORY_SEPARATOR . 'html' . DIRECTORY_SEPARATOR;
                 if (!@mkdir($html_path)) {
+                    \Idno\Core\Idno::site()->logging()->debug("Could not make {$html_path}");
                     return false;
                 }
                 $file_path = $dir . $name . DIRECTORY_SEPARATOR . 'files' . DIRECTORY_SEPARATOR;
                 if (!@mkdir($file_path)) {
+                    \Idno\Core\Idno::site()->logging()->debug("Could not make {$file_path}");
                     return false;
                 }
 
                 if (!@mkdir($file_path . 'readable', 0777, true)) {
+                    \Idno\Core\Idno::site()->logging()->debug("Could not make {$file_path}readable");
                     return false;
                 }
                 if (!@mkdir($file_path . 'uploads', 0777, true)) {
+                    \Idno\Core\Idno::site()->logging()->debug("Could not make {$file_path}uploads");
                     return false;
                 }
 
                 // If we've made it here, we've created a temporary directory with the hash name
 
                 $config = array(
-                    'url'   => site()->config()->getURL(),
-                    'title' => site()->config()->getTitle()
+                    'url'   => Idno::site()->config()->getURL(),
+                    'title' => Idno::site()->config()->getTitle(),
+                    
+                    // Include some version info in case we change the export format
+                    'version' => Idno::site()->getVersion(),
+                    'build' => Idno::site()->getMachineVersion(),
                 );
 
                 file_put_contents($dir . $name . DIRECTORY_SEPARATOR . 'known.json', json_encode($config));
@@ -62,31 +73,36 @@
 
                 // Let's export everything.
                 $fields           = array();
-                $query_parameters = array('entity_subtype' => array('$not' => array('$in' => array('Idno\Entities\ActivityStreamPost'))));
+                $query_parameters = array();
                 $collection       = 'entities';
-                
-                $limit = 10;
+
+                $limit  = 10;
                 $offset = 0;
+
+                \Idno\Core\Idno::site()->logging()->debug("Exporting entities...");
                 
-                while ($results = site()->db()->getRecords($fields, $query_parameters, $limit, $offset, $collection)) {
+                $f = fopen($dir . $name . DIRECTORY_SEPARATOR . 'entities.json', 'wb');
+                fwrite($f, '[');
+                
+                while ($results = Idno::site()->db()->getRecords($fields, $query_parameters, $limit, $offset, $collection)) {   
                     foreach ($results as $id => $row) {
 
-                        $object = site()->db()->rowToEntity($row);
+                        $object = Idno::site()->db()->rowToEntity($row);
                         if (!empty($object->_id) && $object instanceof Entity) {
                             $object_name = $object->_id;
                             $attachments = $object->attachments;
                             if (empty($attachments)) {
                                 $attachments = [];
                             }
-                            foreach(['thumbnail','thumbnail_large'] as $thumbnail)
-                            if (!empty($object->$thumbnail)) {
-                                if (preg_match('/file\/([a-zA-Z0-9]+)\//', $object->$thumbnail, $matches)) {
-                                    $attachments[] = [
-                                        'url' => $object->$thumbnail,
-                                        '_id' => $matches[1]
-                                    ];
+                            foreach (['thumbnail', 'thumbnail_large'] as $thumbnail)
+                                if (!empty($object->$thumbnail)) {
+                                    if (preg_match('/file\/([a-zA-Z0-9]+)\//', $object->$thumbnail, $matches)) {
+                                        $attachments[] = [
+                                            'url' => $object->$thumbnail,
+                                            '_id' => $matches[1]
+                                        ];
+                                    }
                                 }
-                            }
                             if (!empty($attachments)) {
                                 foreach ($attachments as $key => $attachment) {
                                     if ($data = File::getFileDataFromAttachment($attachment)) {
@@ -101,32 +117,25 @@
                                             $mime_type = 'application/octet-stream';
                                         }
                                         file_put_contents($file_path . 'readable/' . $filename, $data);
-                                        $attachments[$key]['url'] = '../files/' . site()->config()->pathHost() . '/' . $id[0] . '/' . $id[1] . '/' . $id[2] . '/' . $id[3] . '/' . $id . '.file'; //$filename;
-                                        $data_file                = $file_path . 'uploads/' . \Idno\Core\site()->config()->pathHost() . '/' . $id[0] . '/' . $id[1] . '/' . $id[2] . '/' . $id[3] . '/' . $id . '.data';
-                                        foreach (array($file_path . 'uploads/' . \Idno\Core\site()->config()->pathHost(), $file_path . \Idno\Core\site()->config()->pathHost() . '/' . $id[0], $file_path . 'uploads/' . \Idno\Core\site()->config()->pathHost() . '/' . $id[0] . '/' . $id[1], $file_path . 'uploads/' . \Idno\Core\site()->config()->pathHost() . '/' . $id[0] . '/' . $id[1] . '/' . $id[2], $file_path . 'uploads/' . \Idno\Core\site()->config()->pathHost() . '/' . $id[0] . '/' . $id[1] . '/' . $id[2] . '/' . $id[3]) as $up_path) {
+                                        $attachments[$key]['url'] = '../files/' . Idno::site()->config()->pathHost() . '/' . $id[0] . '/' . $id[1] . '/' . $id[2] . '/' . $id[3] . '/' . $id . '.file'; //$filename;
+                                        $data_file                = $file_path . 'uploads/' . \Idno\Core\Idno::site()->config()->pathHost() . '/' . $id[0] . '/' . $id[1] . '/' . $id[2] . '/' . $id[3] . '/' . $id . '.data';
+                                        foreach (array($file_path . 'uploads/' . \Idno\Core\Idno::site()->config()->pathHost(), $file_path . \Idno\Core\Idno::site()->config()->pathHost() . '/' . $id[0], $file_path . 'uploads/' . \Idno\Core\Idno::site()->config()->pathHost() . '/' . $id[0] . '/' . $id[1], $file_path . 'uploads/' . \Idno\Core\Idno::site()->config()->pathHost() . '/' . $id[0] . '/' . $id[1] . '/' . $id[2], $file_path . 'uploads/' . \Idno\Core\Idno::site()->config()->pathHost() . '/' . $id[0] . '/' . $id[1] . '/' . $id[2] . '/' . $id[3]) as $up_path) {
                                             if (!is_dir($up_path)) {
                                                 $result = mkdir($up_path, 0777, true);
                                             }
                                         }
-                                        file_put_contents($file_path . 'uploads/' . site()->config()->pathHost() . '/' . $id[0] . '/' . $id[1] . '/' . $id[2] . '/' . $id[3] . '/' . $id . '.file', $data);
+                                        file_put_contents($file_path . 'uploads/' . Idno::site()->config()->pathHost() . '/' . $id[0] . '/' . $id[1] . '/' . $id[2] . '/' . $id[3] . '/' . $id . '.file', $data);
                                         file_put_contents($data_file, json_encode(['filename' => $filename, 'mime_type' => $mime_type]));
                                     }
                                 }
                                 $object->attachments = $attachments;
                             }
-                            $activityStreamPost = new \Idno\Entities\ActivityStreamPost();
-                            if ($owner = $object->getOwner()) {
-                                $activityStreamPost->setOwner($owner);
-                                $activityStreamPost->setActor($owner);
-                                $activityStreamPost->setTitle(sprintf("%s posted %s", $owner->getTitle(), $object->getTitle()));
-                            }
-                            $activityStreamPost->setVerb('post');
-                            $activityStreamPost->setObject($object);
                             $json_object = json_encode($object);
                             file_put_contents($json_path . $object_name . '.json', $json_object);
-                            $all_in_one_json[] = json_decode($json_object);
+                            //$all_in_one_json[] = json_decode($json_object);
+                            fwrite($f, $json_object . ',');
+                            
                             if (is_callable(array($object, 'draw'))) {
-                                //file_put_contents($html_path . $object_name . '.html', $activityStreamPost->draw());
                                 file_put_contents($html_path . $object_name . '.html', $object->draw());
                             }
                             //unset($results[$id]);
@@ -134,23 +143,45 @@
                             gc_collect_cycles();    // Clean memory
                         }
                     }
-                    
+
                     $results = null;
                     $offset += $limit;
                 }
-
-                if ($exported_records = \Idno\Core\site()->db()->exportRecords()) {
-                    if (site()->config()->database == 'mysql' || site()->config()->database == 'postgres') {
-                        $export_ext = 'sql';
-                    } else {
-                        $export_ext = 'json';
-                    }
-                    file_put_contents($dir . $name . DIRECTORY_SEPARATOR . 'exported_data.' . $export_ext, $exported_records);
+                
+                fwrite($f, '{}]'); // Fudge to allow json decode
+                fclose($f);
+                
+                
+                
+                \Idno\Core\Idno::site()->logging()->debug("Generating export records...");
+                $db = \Idno\Core\Idno::site()->db();
+                if ($db instanceof \Idno\Data\AbstractSQL) {
+                    $export_ext = 'sql';
+                } else {
+                    $export_ext = 'json';
                 }
+                
+                $limit = 10;
+                $offset = 0;
+                $f = fopen($dir . $name . DIRECTORY_SEPARATOR . 'exported_data.' . $export_ext, 'wb');
+                fwrite($f, '[');
+                while ($exported_records = \Idno\Core\Idno::site()->db()->exportRecords('entities', $limit, $offset)) {
+                    
+                    if ($export_ext == 'json')
+                        fwrite($f, trim($exported_records, '[],') . ',');
+                    else
+                        fwrite($f, $exported_records);
+                    
+                    $offset += $limit;
+                }
+                if ($export_ext == 'json')
+                    fwrite($f, '{}]'); // Fudge to allow json decode
+                fclose($f);
 
-                file_put_contents($dir . $name . DIRECTORY_SEPARATOR . 'entities.json', json_encode($all_in_one_json));
+                //file_put_contents($dir . $name . DIRECTORY_SEPARATOR . 'entities.json', json_encode($all_in_one_json));
 
                 // As we're successful, return the unique name of the archive
+                \Idno\Core\Idno::site()->logging()->debug("Archive constructed at {$dir}{$name}");
                 return $dir . $name;
 
             }
@@ -173,13 +204,15 @@
                     $path .= DIRECTORY_SEPARATOR;
                 }
                 if (!file_exists($path . 'known.json')) {
+                    \Idno\Core\Idno::site()->logging()->debug("{$path}known.json file does not exist");
                     return false;
                 }
                 if (!class_exists('PharData')) {
+                    \Idno\Core\Idno::site()->logging()->debug("Phar support missing");
                     return false;
                 }
 
-                $filename = str_replace('.', '_', site()->config()->host);
+                $filename = str_replace('.', '_', Idno::site()->config()->host);
 
                 if (file_exists(site()->config()->getTempDir() . $filename . '.tar')) {
                     @unlink(site()->config()->getTempDir() . $filename . '.tar');
@@ -190,6 +223,8 @@
                 $archive->buildFromDirectory($path);
 
                 //$archive->compress(\Phar::GZ);
+                
+                \Idno\Core\Idno::site()->logging()->debug("archiveExportFolder() completed");
 
                 return $archive->getPath();
 
@@ -218,7 +253,7 @@
              */
             static function cleanUpFolder($path)
             {
-                foreach (glob("{path}/*") as $file) {
+                foreach (glob("{$path}/*") as $file) {
                     if (is_dir($file)) {
                         self::cleanUpFolder($file);
                     } else {
@@ -236,7 +271,7 @@
             {
 
                 // Blogger will be imported as blog posts, so make sure we can import those ...
-                if (!($text = site()->plugins()->get('Text'))) {
+                if (!($text = Idno::site()->plugins()->get('Text'))) {
                     return false;
                 }
 
@@ -244,6 +279,8 @@
                 $xml_parser->set_raw_data($xml);
                 $xml_parser->init();
 
+                $imported = 0;
+                
                 if ($items = $xml_parser->get_items()) {
 
                     foreach ($items as $item) {
@@ -284,11 +321,17 @@
                             $object->setTitle(html_entity_decode($item->get_title()));
                             $object->created = strtotime(($item->get_date("c")));
                             $object->body    = ($body);
-                            $object->save(true);
+                            //$object->publish(true);
+                            $object->save();
+                            
+                            $imported++;
                         }
 
                     }
 
+                    // for now, lets assume a successful save
+                    if ($imported > 0)
+                        return true;
                 }
 
             }
@@ -302,7 +345,7 @@
                         foreach ($images as $image) {
                             $src = $image->getAttribute('src');
                             if (substr_count($src, $src_url)) {
-                                $dir     = site()->config()->getTempDir();
+                                $dir     = Idno::site()->config()->getTempDir();
                                 $name    = md5($src);
                                 $newname = $dir . $name . basename($src);
                                 if (@file_put_contents($newname, fopen($src, 'r'))) {
@@ -321,7 +364,7 @@
                                             $mime = 'application/octet-stream';
                                     }
                                     if ($file = File::createFromFile($newname, basename($src), $mime, true)) {
-                                        $newsrc = \Idno\Core\site()->config()->getURL() . 'file/' . $file->file['_id'];
+                                        $newsrc = \Idno\Core\Idno::site()->config()->getURL() . 'file/' . $file->file['_id'];
                                         $body   = str_replace($src, $newsrc, $body);
                                         @unlink($newname);
                                     }
@@ -353,9 +396,11 @@
             {
 
                 // XML will be imported as blog posts, so make sure we can import those ...
-                if (!($text = site()->plugins()->get('Text'))) {
+                if (!($text = \Idno\Core\Idno::site()->plugins()->get('Text'))) {
                     return false;
                 }
+                
+                libxml_use_internal_errors(true);
 
                 if ($data = simplexml_load_string($xml, null, LIBXML_NOCDATA)) {
 
@@ -364,6 +409,8 @@
 
                     unset($namespace_data);
                     unset($xml);
+                    
+                    $imported = 0;
 
                     if (!empty($data->channel->item)) {
                         foreach ($data->channel->item as $item_structure) {
@@ -403,7 +450,7 @@
                                     }
                                     foreach ($item['category'] as $category) {
                                         $category = strtolower(trim($category));
-                                        if ($category != 'general') {
+                                        if ($category != 'general' && $category != 'uncategorized') {
                                             $tags[] = '#' . preg_replace('/\W+/', '', $category);
                                         }
                                     }
@@ -413,22 +460,207 @@
                                 }
 
                                 self::importImagesFromBodyHTML($body, parse_url($item['link'], PHP_URL_HOST));
+                                if (empty($item['title']) && strlen($body) < 600) {
+                                    \Idno\Core\Idno::site()->logging()->debug("Creating new Status post");
+                                    $object          = new \IdnoPlugins\Status\Status();
+                                    $object->created = $published;
+                                    $object->body    = ($body);
+                                    $object->save();
+                                    //$object->publish(true); // Pingig probably a bad idea for imports, plus it is vvvvveeeeeeeerrrrrrrrrryyyyyyy slow
+                                    
+                                    $imported++;
 
-                                $object = new \IdnoPlugins\Text\Entry();
-                                $object->setTitle(html_entity_decode($title));
-                                $object->created = $published;
-                                $object->body    = ($body);
-                                $object->save(true);
+                                } else {
+                                    \Idno\Core\Idno::site()->logging()->debug("Creating new Entry from '$title'");
+                                    $object = new \IdnoPlugins\Text\Entry();
+                                    $object->setTitle(html_entity_decode($title));
+                                    $object->created = $published;
+                                    $object->body    = ($body);
+                                    $object->save();
+                                    //$object->publish(true);
+                                    
+                                    $imported++;
+                                }
 
-                            }
+                                if (!empty($item['wp:comment'])) {
+                                    if (!is_array($item['wp:comment'])) {
+                                        $item['wp:comment'] = [$item['wp:comment']];
+                                    }
+                                    foreach ($item['wp:comment'] as $comment_obj) {
+                                        $comment = (array)$comment_obj;
+                                        if ($object->addAnnotation('reply',
+                                            $comment['comment_author'],
+                                            $comment['comment_author_url'],
+                                            '',
+                                            $comment['comment_content'],
+                                            null,
+                                            strtotime($comment['comment_date_gmt']),
+                                            null,
+                                            [],
+                                            false
+                                        )
+                                        ) {
+                                            $object->save();
+                                        }
+                                    }
+                                }
+                            } 
 
                         }
+                        
+                        // For now, lets assume that everything saved ok, if something was imported
+                        if ($imported > 0)
+                            return true;
                     }
 
                 }
+                
+                // Catch and log any XML parsing errors and report them
+                foreach (libxml_get_errors() as $error) {
+                    \Idno\Core\Idno::site()->logging()->error($error->message);
+                }
+
+                libxml_clear_errors();
 
             }
 
+            /**
+             * Retrieve all posts as an RSS feed
+             * @param bool|true $hide_private Should we hide private posts? Default: true.
+             * @param string $user_uuid User UUID to export for. Default: all users.
+             * @return resource a file pointer resource on success, false on error
+             */
+            static function getExportRSS($hide_private = true, $user_uuid = '')
+            {
+                $types = \Idno\Common\ContentType::getRegisteredClasses();
+                if ($hide_private) {
+                    $groups = ['PUBLIC'];
+                } else {
+                    $groups = [];
+                }
+                if (!empty($user_uuid)) {
+                    $search = ['owner' => $user_uuid];
+                    if ($user = User::getByUUID($user_uuid)) {
+                        $title       = $user->getTitle();
+                        $description = $user->getDescription();
+                        $base_url    = $user_uuid;
+                    }
+                } else {
+                    $search      = [];
+                    $title       = Idno::site()->config()->getTitle();
+                    $description = Idno::site()->config()->getDescription();
+                    $base_url    = Idno::site()->config()->getDisplayURL();
+                }
+                
+                // If $folder is false or doesn't exist, use the temporary directory and ensure it has a slash on the end of it
+                $dir = Idno::site()->config()->getTempDir();
+                
+                $name = md5(time() . rand(0, 9999) . Idno::site()->config()->getURL());
+                
+                // Make the temporary directory, or fail out
+                if (!@mkdir($dir . $name)) {
+                    \Idno\Core\Idno::site()->logging()->debug("Could not make temporary directory {$dir}{$name}");
+                    return false;
+                }
+                
+                $rss_path = $dir . $name . DIRECTORY_SEPARATOR . 'rss' . DIRECTORY_SEPARATOR;
+                
+                if (!@mkdir($rss_path)) {
+                    \Idno\Core\Idno::site()->logging()->debug("Could not make temporary directory {$rss_path}");
+                    return false;
+                }
+                
+                // Create export of items
+                $limit = 10;
+                $offset = 0;
+                
+                $f = fopen($rss_path . 'items.rss.fragment', 'wb');
+                
+                while ($feed = \Idno\Common\Entity::getFromX($types, $search, array(), $limit, $offset, $groups)) {
+                    
+                    foreach ($feed as $item) {
+                        
+                        $tmp = new \DOMDocument();
+                        $tmp->formatOutput = true;
+                        
+                        fwrite($f, $tmp->saveXML($tmp->importNode($item->rssSerialise(), true)) . "\n");
+                    }
+                    
+                    $offset += $limit;
+                }
+                
+                fclose($f);
+                
+                // Build the empty export template
+                $rss_theme = new Template();
+                $rss_theme->setTemplateType('rss');
+
+                file_put_contents($rss_path . 'template.rss.fragment', $rss_theme->__(array(
+
+                    'title'       => $title,
+                    'description' => $description,
+                    'body'        => $rss_theme->__(array(
+                        'items'    => $feed,
+                        'offset'   => 0,
+                        'count'    => sizeof($feed),
+                        'subject'  => [],
+                        //'nocdata'  => true,
+                        'base_url' => $base_url
+                    ))->draw('pages/home'),
+
+                ))->drawPage(false));
+                
+                // Now construct full rss
+                $f = fopen($rss_path . 'export.rss', 'wb');
+                
+                $f_template = fopen($rss_path . 'template.rss.fragment', 'rb');
+                
+                while ($content = fgets($f_template)) {
+                    
+                    // Write out the content
+                    fwrite($f, $content);
+                    
+                    // We've found our insertion point, so we need to mix in our second file.
+                    if (strpos($content, '<!--##KNOWNFEEDITEMS##-->')!==false) {
+                        $f_items = fopen($rss_path . 'items.rss.fragment', 'rb');
+                
+                        while ($items = fgets($f_items)) {
+                            fwrite($f, $items);
+                        }
+                        
+                        fclose($f_items);
+                    }
+                }
+                
+                fclose($f_template);
+                
+                fclose($f);
+                
+                // Got here, open a readable file pointer
+                return fopen($rss_path . 'export.rss', 'r');
+                
+//                if ($feed = \Idno\Common\Entity::getFromX($types, $search, array(), PHP_INT_MAX-1, 0, $groups)) {
+//                    $rss_theme = new Template();
+//                    $rss_theme->setTemplateType('rss');
+//                    
+//                    return $rss_theme->__(array(
+//
+//                        'title'       => $title,
+//                        'description' => $description,
+//                        'body'        => $rss_theme->__(array(
+//                            'items'    => $feed,
+//                            'offset'   => 0,
+//                            'count'    => sizeof($feed),
+//                            'subject'  => [],
+//                            //'nocdata'  => true,
+//                            'base_url' => $base_url
+//                        ))->draw('pages/home'),
+//
+//                    ))->drawPage(false);
+//                }
+//
+//                return false;
+            }
 
         }
 

@@ -9,7 +9,7 @@
 
             function getTitle()
             {
-                if (empty($this->title)) return 'Untitled';
+                if (empty($this->title)) return '';
 
                 return $this->title;
             }
@@ -34,7 +34,7 @@
                 }
 
                 if (!$this->getSlug() && ($this->getID())) {
-                    return \Idno\Core\site()->config()->url . 'entry/' . $this->getID() . '/' . $this->getPrettyURLTitle();
+                    return \Idno\Core\Idno::site()->config()->url . 'entry/' . $this->getID() . '/' . $this->getPrettyURLTitle();
                 } else {
                     return parent::getURL();
                 }
@@ -49,6 +49,11 @@
             {
                 return 'article';
             }
+            
+            function getMetadataForFeed()
+            {
+                return array('type' => 'entry');
+            }
 
             /**
              * Retrieve icon
@@ -56,12 +61,14 @@
              */
             function getIcon()
             {
-                $xpath = new \DOMXPath(@\DOMDocument::loadHTML($this->getDescription()));
-                $src   = $xpath->evaluate("string(//img/@src)");
-                if (!empty($src)) {
-                    return $src;
+                $doc = @\DOMDocument::loadHTML($this->getDescription());
+                if ($doc) {
+                    $xpath = new \DOMXPath($doc);
+                    $src   = $xpath->evaluate("string(//img/@src)");
+                    if (!empty($src)) {
+                        return $src;
+                    }
                 }
-
                 return parent::getIcon();
             }
 
@@ -73,32 +80,40 @@
                 } else {
                     $new = false;
                 }
-                $body = \Idno\Core\site()->currentPage()->getInput('body');
+                $body = \Idno\Core\Idno::site()->currentPage()->getInput('body');
                 if (!empty($body)) {
 
                     $this->body  = $body;
-                    $this->title = \Idno\Core\site()->currentPage()->getInput('title');
-                    $this->tags  = \Idno\Core\site()->currentPage()->getInput('tags');
-                    $access      = \Idno\Core\site()->currentPage()->getInput('access');
+                    $this->title = \Idno\Core\Idno::site()->currentPage()->getInput('title');
+                    $this->tags  = \Idno\Core\Idno::site()->currentPage()->getInput('tags');
+                    $access      = \Idno\Core\Idno::site()->currentPage()->getInput('access');
                     $this->setAccess($access);
+                    
+                    // Make Entry publish status aware
+                    $publish_status = \Idno\Core\Idno::site()->currentPage()->getInput('publish_status', 'published');
+                    if (!empty($publish_status)) {
+                        $this->setPublishStatus($publish_status);
+                    }
 
-                    if ($time = \Idno\Core\site()->currentPage()->getInput('created')) {
+                    if ($time = \Idno\Core\Idno::site()->currentPage()->getInput('created')) {
                         if ($time = strtotime($time)) {
                             $this->created = $time;
                         }
                     }
 
-                    if ($this->save($new)) {
+                    if ($this->publish($new)) {
 
                         $autosave = new Autosave();
                         $autosave->clearContext('entry');
 
-                        \Idno\Core\Webmention::pingMentions($this->getURL(), \Idno\Core\site()->template()->parseURLs($this->getTitle() . ' ' . $this->getDescription()));
+                        if ($this->getAccess() == 'PUBLIC') {
+                            \Idno\Core\Webmention::pingMentions($this->getURL(), \Idno\Core\Idno::site()->template()->parseURLs($this->getTitle() . ' ' . $this->getDescription()));
+                        }
 
                         return true;
                     }
                 } else {
-                    \Idno\Core\site()->session()->addErrorMessage('You can\'t save an empty entry.');
+                    \Idno\Core\Idno::site()->session()->addErrorMessage('You can\'t save an empty entry.');
                 }
 
                 return false;
@@ -107,7 +122,9 @@
 
             function deleteData()
             {
-                \Idno\Core\Webmention::pingMentions($this->getURL(), \Idno\Core\site()->template()->parseURLs($this->getTitle() . ' ' . $this->getDescription()));
+                if ($this->getAccess() == 'PUBLIC') {
+                    \Idno\Core\Webmention::pingMentions($this->getURL(), \Idno\Core\Idno::site()->template()->parseURLs($this->getTitle() . ' ' . $this->getDescription()));
+                }
             }
 
         }

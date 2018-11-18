@@ -22,21 +22,21 @@
 
             function registerEventHooks()
             {
-                \Idno\Core\site()->events()->addListener('syndicate', function (\Idno\Core\Event $event) {
+                \Idno\Core\Idno::site()->events()->addListener('syndicate', function (\Idno\Core\Event $event) {
 
                     $eventdata = $event->data();
                     if (!empty($eventdata['object'])) {
                         $content_type = $eventdata['object']->getActivityStreamsObjectType();
-                        if ($services = \Idno\Core\site()->syndication()->getServices($content_type)) {
-                            if ($selected_services = \Idno\Core\site()->currentPage()->getInput('syndication')) {
+                        if ($services = \Idno\Core\Idno::site()->syndication()->getServices($content_type)) {
+                            if ($selected_services = \Idno\Core\Idno::site()->currentPage()->getInput('syndication')) {
                                 if (!empty($selected_services) && is_array($selected_services)) {
                                     foreach ($selected_services as $selected_service) {
-                                        $event->data()['syndication_account'] = false;
+                                        $eventdata['syndication_account'] = false;
                                         if (in_array($selected_service, $services)) {
-                                            site()->triggerEvent('post/' . $content_type . '/' . $selected_service, $eventdata);
+                                            site()->queue()->enqueue('default', 'post/' . $content_type . '/' . $selected_service, $eventdata);
                                         } else if ($implied_service = $this->getServiceByAccountString($selected_service)) {
                                             $eventdata['syndication_account'] = $this->getAccountFromAccountString($selected_service);
-                                            site()->triggerEvent('post/' . $content_type . '/' . $implied_service, $eventdata);
+                                            site()->queue()->enqueue('default', 'post/' . $content_type . '/' . $implied_service, $eventdata);
                                         }
                                     }
                                 }
@@ -54,22 +54,24 @@
              */
             function getServices($content_type = false)
             {
+                $services = [];
+
                 if (!empty($content_type)) {
                     if (!empty($this->services[$content_type])) {
-                        return $this->services[$content_type];
+                        $services = $this->services[$content_type];
                     }
                 } else {
-                    $return = array();
                     if (!empty($this->services)) {
                         foreach ($this->services as $service) {
-                            $return = array_merge($return, $service);
+                            $services = array_merge($services, $service);
                         }
                     }
 
-                    return array_unique($return);
                 }
 
-                return array();
+                $services = Idno::site()->triggerEvent('syndication/services/get', ['services' => $services], $services);
+
+                return array_unique($services);
             }
 
             /**
@@ -98,11 +100,15 @@
              */
             function getServiceAccountsByService()
             {
+                $accounts = [];
+
                 if (!empty($this->accounts)) {
-                    return $this->accounts;
+                    $accounts = $this->accounts;
                 }
 
-                return array();
+                $accounts = Idno::site()->triggerEvent('syndication/accounts/get', ['accounts' => $accounts], $accounts);
+
+                return $accounts;
             }
 
             /**
@@ -139,26 +145,27 @@
                     }
                 }
                 $this->checkers[$service] = $checker;
-                \Idno\Core\site()->template()->extendTemplate('content/syndication', 'content/syndication/' . $service);
+                \Idno\Core\Idno::site()->template()->extendTemplate('content/syndication', 'content/syndication/' . $service);
             }
 
             /**
              * Registers an account on a particular service as being available. The service itself must also have been registered.
              * @param string $service The name of the service.
              * @param string $username The username or user identifier on the service.
-             * @param $display_name A human-readable name for this account.
+             * @param string $display_name A human-readable name for this account.
+             * @param array $other_properties An optional list of additional properties to include in the account record
              */
-            function registerServiceAccount($service, $username, $display_name)
+            function registerServiceAccount($service, $username, $display_name, $other_properties=array())
             {
                 $service = strtolower($service);
                 if (!empty($this->accounts[$service])) {
-                    foreach ($this->accounts[$service] as $key => $account) {
+                    foreach ($this->accounts[$service] as $idx => $account) {
                         if ($account['username'] == $username) {
-                            unset($this->accounts[$service][$key]); // Remove existing entry if it exists, so fresher one can be added
+                            unset($this->accounts[$service][$idx]); // Remove existing entry if it exists, so fresher one can be added
                         }
                     }
                 }
-                $this->accounts[$service][] = array('username' => $username, 'name' => $display_name);
+                $this->accounts[$service][] = array_merge($other_properties, ['username' => $username, 'name' => $display_name]);
             }
 
             /**
@@ -216,9 +223,8 @@
                     foreach ($services as $service_name => $service) {
                         foreach ($service as $account) {
                             $data[] = [
-                                'id'      => $service_name . '::' . $account['username'],
-                                'name'    => $account['name'],
-                                'service' => $service_name
+                                'uid'  => $service_name . '::' . $account['username'],
+                                'name' => $account['name'] . ' on ' . ucwords($service_name),
                             ];
                         }
                     }

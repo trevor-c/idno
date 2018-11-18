@@ -11,12 +11,12 @@
 
             // Property containing the entity class associated with this content type (default is generic object type)
             static public $registered = array();
-            public $entity_class = 'Idno\\Entities\\Object';
+            public $entity_class = 'Idno\\Entities\\BaseObject';
             public $handler_class = 'Idno\\Common\\ContentType';
             public $title = 'Content type';
             public $indieWebContentType = array();
 
-            // Static property containing register of all content types
+            // Will this content type show on the creation menu
             public $createable = true;
 
             /**
@@ -65,10 +65,10 @@
             function getCategoryTitle()
             {
                 if (!empty($this->category_title)) {
-                    return $this->category_title;
+                    return \Idno\Core\Idno::site()->language()->get($this->category_title);
                 }
 
-                return $this->getTitle();
+                return \Idno\Core\Idno::site()->language()->get($this->getTitle());
             }
 
             /**
@@ -77,7 +77,22 @@
              */
             function getTitle()
             {
-                return $this->title;
+                return \Idno\Core\Idno::site()->language()->get($this->title);
+            }
+
+            /**
+             * Retrieves the name of the entity class associated with this content type
+             * @param bool $convert_slashes If set to true, converts \ slashes to / (false by default)
+             * @return string
+             */
+            function getEntityClass($convert_slashes = false)
+            {
+                $return = $this->entity_class;
+                if ($convert_slashes) {
+                    $return = str_replace('\\', '/', $return);
+                }
+
+                return $return;
             }
 
             /**
@@ -134,7 +149,7 @@
                         /* @var ContentType $contentType */
                         $categoryTitle = $contentType->getCategoryTitleSlug();
                         if ($friendly_name == str_replace(' ', '', trim(strtolower($categoryTitle)))) {
-                            return $contentType->getCategoryTitle();
+                            return \Idno\Core\Idno::site()->language()->get($contentType->getCategoryTitle());
                         }
                     }
                 }
@@ -230,16 +245,8 @@
             {
                 if ($registered = self::getRegistered()) {
                     foreach ($registered as $contentType) {
-                        if (!empty($contentType->indieWebContentType)) {
-                            if (is_array($contentType->indieWebContentType)) {
-                                if (in_array($type, $contentType->indieWebContentType)) {
-                                    return $contentType;
-                                }
-                            } else {
-                                if ($type == $contentType->indieWebContentType) {
-                                    return $contentType;
-                                }
-                            }
+                        if (in_array($type, (array)$contentType->indieWebContentType)) {
+                            return $contentType;
                         }
                     }
                 }
@@ -254,7 +261,13 @@
              */
             function getIcon()
             {
-                return \Idno\Core\site()->template()->draw('entity/' . $this->getEntityClassName() . '/icon');
+                $t      = \Idno\Core\Idno::site()->template();
+                $result = $t->draw('entity/' . $this->getEntityClass(true) . '/icon');
+                if (!$result) {
+                    $result = $t->draw('entity/' . $this->getEntityClassName() . '/icon');
+                }
+
+                return $result;
             }
 
             /**
@@ -266,15 +279,6 @@
                 $class = $this->getEntityClass();
 
                 return substr($class, strrpos($class, '\\') + 1);
-            }
-
-            /**
-             * Retrieves the name of the entity class associated with this content type
-             * @return string
-             */
-            function getEntityClass()
-            {
-                return $this->entity_class;
             }
 
             /**
@@ -298,7 +302,7 @@
              */
             function getEditURL()
             {
-                return \Idno\Core\site()->config()->url . $this->camelCase($this->getEntityClassName()) . '/edit';
+                return \Idno\Core\Idno::site()->config()->url . $this->camelCase($this->getEntityClassName()) . '/edit';
             }
 
         }

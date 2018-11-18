@@ -10,7 +10,7 @@
 
     namespace Idno\Entities {
 
-        class GenericDataItem extends \Idno\Entities\Object
+        class GenericDataItem extends \Idno\Entities\BaseObject
         {
             /**
              * Retrieve a bit of generic data by it's data type
@@ -40,7 +40,7 @@
             public function save($add_to_feed = false, $feed_verb = 'post')
             {
                 if (empty($this->datatype)) {
-                    throw new \Exception("GenericDataItem classes must have a datatype label set.");
+                    throw new \RuntimeException("GenericDataItem classes must have a datatype label set.");
                 }
 
                 return parent::save($add_to_feed, $feed_verb);

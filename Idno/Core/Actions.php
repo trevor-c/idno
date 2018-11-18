@@ -9,7 +9,7 @@
 
     namespace Idno\Core {
 
-        class Actions extends \Bonita\Forms
+        class Actions extends \Idno\Core\Bonita\Forms
         {
 
             /**
@@ -22,7 +22,7 @@
              */
             public static function validateToken($action = '', $haltExecutionOnBadRequest = true)
             {
-                if (site()->session()->isAPIRequest()) {
+                if (Idno::site()->session()->isAPIRequest()) {
                     return true;
                 }
 
@@ -41,7 +41,7 @@
              */
             function createLink($pageurl, $label, $data = array(), $options = array())
             {
-                $params = array('url' => $pageurl, 'label' => $label, 'data' => $data, 'class' => '', 'confirm' => false, 'confirm-text' => 'Are you sure?');
+                $params = array('url' => $pageurl, 'label' => $label, 'data' => $data, 'class' => '', 'confirm' => false, 'confirm-text' => 'Are you sure?', 'title' => '');
                 $params = array_merge($params, $options);
 
                 return site()->template()->__($params)->draw('forms/link');
