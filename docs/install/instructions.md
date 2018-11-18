@@ -1,6 +1,6 @@
-# Installation instructions
+# Installation Instructions
 
-##Before you begin
+## Before you begin
 
 If you’re running Known in production, we highly recommend that you download the installation package from [withknown.com](https://withknown.com).
 
@@ -17,11 +17,15 @@ You can place the platform on your web host by:
 + Downloading the latest package from [the Known homepage](https://withknown.com/). This is by far the easiest option. If you’ve uploaded the files inside the archive to your web host, you can skip to the configuration section of these documents, below.
 * If you have more control over your server, you can also use Git to clone the code from [our repository](https://github.com/idno/known). Git is a technical source code management system that is out of scope for this guide, so if in doubt, use point one.
 
+### Alternative Packages
+
+If you want to run the (almost) latest and greatest code, but aren't able to track github, you may opt to use one of the [unofficial Known installation packages](https://www.marcus-povey.co.uk/known/). These packages are built from github, and often contain newer features than in the official release.
+
 ## Configure Known
 
 ### Use the automatic installer
 
-If you’re using a MySQL back-end, you can get started by pointing your browser at your Known site address. If you want to use MongoDB (or another database backend), you’ll need to create the configuration file manually, as described below.
+If you’re using a MySQL back-end, you can get started by pointing your browser at your Known site address. If you want to use MongoDB (or another database backend), you’ll need to create the configuration file manually, as described below, or use the CLI installer.
 
 ### Use environment variables
 
@@ -35,7 +39,7 @@ If you’re using Docker or other virtualized server environments, you will need
 
 ### If you’re using MySQL
 
-Currently, MySQL users need to create a file called ```config.ini``` in the root of their installation. This should contain the following information:
+Currently, MySQL users need to create a file called ```config.ini``` in you ```/configuration/``` directory. This should contain the following information:
 
     database = "MySQL"
     dbname = "Your MySQL database name"
@@ -127,3 +131,7 @@ Register and log in.
 ### Administer Known
 
 Once you’ve registered and logged in, click “Administration” in the menu bar. This will allow you to set some site configuration items, including the site name. You will also be able to enable some plugins from this screen. If you’re using Known as a blog or a closed community, you will probably also want to turn open registration off from here.
+
+## Command Line Installation
+
+A command line installer is available, which is useful for installing Known over slow connections or in a scripted environment. Details can be found [here](cliinstaller.md).

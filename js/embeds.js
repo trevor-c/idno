@@ -2,13 +2,12 @@
  * Embedding code for various platforms
  * IMPORTANT:
  * This file isn't loaded directly, for changes to show you must generate a minified
- * version. E.g.
- *
- *   yui-compressor embeds.js > embeds.min.js
+ * version by executing the Gruntfile. See: http://docs.withknown.com/en/latest/developers/build/
  */
 
+"use strict";
 
-function Unfurl() {}
+var Unfurl = Unfurl || {};
 
 /**
  * Attempt to unfurl a url, extracting, title, open graph and oembed information
@@ -32,7 +31,7 @@ Unfurl.fetch = function (url, callback) {
 	    );
 	}, known.config.displayUrl + 'service/web/unfurl/');
     }
-}
+};
 
 /**
  * Extract all urls in the text.
@@ -44,7 +43,7 @@ Unfurl.getUrls = function (text) {
     var urlRegex = new RegExp('(https?:\/\/[^\\s]+)', "gi");
 
     return text.match(urlRegex);
-}
+};
 
 /**
  * Find the first url in the text.
@@ -54,12 +53,12 @@ Unfurl.getUrls = function (text) {
 Unfurl.getFirstUrl = function (text) {
 
     var urls = Unfurl.getUrls(text);
-console.log(urls);
+
     if ((urls != undefined) && (urls.length > 0))
 	return urls[0];
     
     return '';
-}
+};
 
 /**
  * Initialise any oembeds found in a specific control.
@@ -105,7 +104,65 @@ Unfurl.initOembed = function (control) {
 	    );
 	}
     }
-}
+};
+
+/**
+ * 
+ * @param {type} control
+ * @returns {undefined}Enable edit controls on unfurl links.
+ */
+Unfurl.enableControls = function (control) {
+    
+    var url = control.attr('data-url');
+    var unfurlblock = control.closest('.unfurl-block');
+    var refresh = unfurlblock.find('.unfurl-edit a.refresh');
+    var remove = unfurlblock.find('.unfurl-edit a.delete');
+    
+    refresh.click(function(e){
+	
+	Security.getCSRFToken(function(token, ts) {
+	    $.ajax(known.config.displayUrl + 'service/web/unfurl/', {
+		dataType: 'json',
+		method: 'GET',
+		data: {
+		    url: url,
+		    forcenew: true,
+		    __bTk: token,
+		    __bTs: ts
+		},
+		success: function (data) {
+		    console.log("Refreshed");
+		    control.fadeOut().fadeIn();
+		    Unfurl.unfurl(control);
+		}
+	    });
+	}, known.config.displayUrl + 'service/web/unfurl/');
+	
+	e.preventDefault();
+    });
+    
+    
+    
+    remove.click(function(e){
+	
+	Security.getCSRFToken(function(token, ts) {
+	    $.ajax(known.config.displayUrl + 'service/web/unfurl/remove/'  + unfurlblock.attr('data-parent-object') + '/', {
+		dataType: 'json',
+		method: 'POST',
+		data: {
+		    __bTk: token,
+		    __bTs: ts
+		},
+		success: function (data) {
+		    console.log("Refresh: deleted");
+		    unfurlblock.fadeOut();
+		}
+	    });
+	}, known.config.displayUrl + 'service/web/unfurl/remove/' + unfurlblock.attr('data-parent-object') + '/');
+	
+	e.preventDefault();
+    });
+};
 
 /**
  * Unfurl a specific embedded control
@@ -121,16 +178,17 @@ Unfurl.unfurl = function (control) {
 	   control.show();
 	   Unfurl.initOembed(control);
 	   Template.enableImageFallback(); // Reactivate image fallback for broken images
+	   Unfurl.enableControls(control);
 	});
     }
-}
+};
 
 
 Unfurl.unfurlAll = function () {
     $('div.unfurl').each(function () {
 	Unfurl.unfurl($(this));
     });
-}
+};
 
 $(document).ready(function () {
     Unfurl.unfurlAll();

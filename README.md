@@ -14,12 +14,11 @@ web hosting provider.
 
 Known is under active development and requires PHP 7+ with selected extensions, together with a supported database backend.
 
-If you are installing Known for use on your own website, we _highly_ recommend using the installable packages
-from <https://withknown.com/opensource>. Installation will be much easier!
-
-You can also opt to check out the bleeding edge code from the git repository: <https://github.com/idno/Known>
+You can opt to check out the bleeding edge code from the git repository: <https://github.com/idno/Known>
 
 Detailed installation instructions: <http://docs.withknown.com/en/latest/install/index.html>
+
+_Unofficial_ install packages, which are periodically built from the latest code, are available: <https://www.marcus-povey.co.uk/known/>
 
 ### Support us
 
@@ -30,7 +29,6 @@ Detailed installation instructions: <http://docs.withknown.com/en/latest/install
 ### Get support
 
 * Try the open source mailing list: <https://groups.google.com/forum/#!forum/known-dev>
-* Commercial support is available: <https://withknown.com/services>
 
 ## Community links
 
@@ -62,10 +60,9 @@ Third party libraries are licensed separately.
   * ClassLoader. Source: https://github.com/symfony/ClassLoader
   * EventDispatcher. Source: https://github.com/symfony/EventDispatcher
   * HttpFoundation. Source: https://github.com/symfony/HttpFoundation
+  * Console. Source: https://github.com/symfony/Console
 * ToroPHP, which is distributed under the MIT License. Source: https://github.com/anandkunal/ToroPHP/
-* Anthony Ferrara's PHP 5.5 password API shim, which is distributed under the MIT license. Source: https://github.com/ircmaxell/password_compat
 * Font Awesome, which is distributed under the Open Font License, version 1.1: http://fortawesome.github.io/Font-Awesome/
-* Fontello, which is distributed under the MIT License, for generating open source webfont. Source: https://github.com/fontello/fontello
 * Steve Clay's AutoP, which is distributed under the MIT License. Source: https://code.google.com/p/mrclay/
 * Aaron Parecki's Webmention Client, which is distributed under the Apache 2.0 license. Source: https://github.com/aaronpk/mention-client
 * Barnaby Walters's Microformats 2 Parser, which is distributed under the MIT License. Source: https://github.com/indieweb/php-mf2
@@ -87,5 +84,4 @@ Third party libraries are licensed separately.
 * Wavesurfer, which is distrubuted under a Creative Commons Attribution 3.0 Unported License. Source: https://github.com/katspaugh/wavesurfer.js
 * MongoDB-PHP-Library, which is distributed under the Apache 2 Licence. Source: https://github.com/mongodb/mongo-php-library
 * Exif-js, which is distributed under the MIT Licence. Source: https://github.com/exif-js/exif-js
-* Fragmentions, distributed under the CC0 1.0 Universal Licence: https://github.com/chapmanu/fragmentions
 * PHP-OGP, distributed under the GPL2 Licence. Source: https://github.com/mapkyca/php-ogp

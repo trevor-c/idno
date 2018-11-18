@@ -1,3 +1,4 @@
+.AppleDouble
 .DS_Store
 .idea/*
 Idno/.idea/.name
@@ -5,7 +6,11 @@ Idno/.idea/.name
 .vagrant
 .elasticbeanstalk
 
+node_modules
+
 *.iml
+*.bak
+test.php
 
 /nbproject/private/nbproject/project.xml
 /nbproject/project.properties
@@ -14,6 +19,7 @@ Idno/.idea/.name
 /.htaccess
 /doc/output/
 /Uploads/*
+/configuration/
 
 /.DS_Store
 /*/.DS_Store
@@ -29,9 +35,7 @@ IdnoPlugins/*
 !IdnoPlugins/APITester/
 !IdnoPlugins/Bridgy/
 !IdnoPlugins/Checkin/
-!IdnoPlugins/Comic/
 !IdnoPlugins/Comments/
-!IdnoPlugins/Convoy/
 !IdnoPlugins/Event/
 !IdnoPlugins/Firefox/
 !IdnoPlugins/FooterJS/
